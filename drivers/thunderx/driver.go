@@ -60,6 +60,7 @@ func (x *ThunderX) Init(ctx context.Context) (err error) {
 				PackageName:       "com.thunder.downloader",
 				UserAgent:         "ANDROID-com.thunder.downloader/1.05.0.2113 netWorkType/5G appid/40 deviceName/Xiaomi_M2004j7ac deviceModel/M2004J7AC OSVersion/12 protocolVersion/301 platformVersion/10 sdkVersion/220200 Oauth2Client/0.9 (Linux 4_14_186-perf-gddfs8vbb238b) (JAVA 0)",
 				DownloadUserAgent: "Dalvik/2.1.0 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)",
+				UseVideoUrl:       x.UseVideoUrl,
 
 				refreshCTokenCk: func(token string) {
 					x.CaptchaToken = token
@@ -88,7 +89,7 @@ func (x *ThunderX) Init(ctx context.Context) (err error) {
 	if ctoekn != "" {
 		x.SetCaptchaToken(ctoekn)
 	}
-
+	x.XunLeiXCommon.UseVideoUrl = x.UseVideoUrl
 	// 防止重复登录
 	identity := x.GetIdentity()
 	if x.identity != identity || !x.IsLogin() {

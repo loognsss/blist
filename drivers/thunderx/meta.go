@@ -43,7 +43,7 @@ type ExpertAddition struct {
 	DownloadUserAgent string `json:"download_user_agent"  required:"true" default:"Dalvik/2.1.0 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)"`
 
 	//优先使用视频链接代替下载链接
-	UseVideoUrl bool `json:"use_video_url" default:"true"`
+	UseVideoUrl bool `json:"use_video_url"`
 }
 
 // 登录特征,用于判断是否重新登录
@@ -74,6 +74,7 @@ type Addition struct {
 	Username     string `json:"username" required:"true"`
 	Password     string `json:"password" required:"true"`
 	CaptchaToken string `json:"captcha_token"`
+	UseVideoUrl  bool   `json:"use_video_url" default:"true"`
 }
 
 // 登录特征,用于判断是否重新登录
