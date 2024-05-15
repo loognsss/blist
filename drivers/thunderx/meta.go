@@ -23,7 +23,7 @@ type ExpertAddition struct {
 	RefreshToken string `json:"refresh_token" required:"true" help:"login type is refresh_token,this is required"`
 
 	// 签名方法1
-	Algorithms string `json:"algorithms" required:"true" help:"sign type is algorithms,this is required" default:"stjLXtWsNE,/fuCv/4LUckQuGTLp6HCq1UIwULc4tWCmdhzIXNWbxWaL95,ckSvOerpXpG26F1zUmY8N5ideJVnRcufy,sCxoJ2TpD1UCbaU/n323sF3IPeUDbXjue,+Fe3cJiip5KjIXjLTFNwyhR7Nmh47ZBfxI4zPnMvtxLQqX1hO,iGwJ8Knqt4jXudQTt8PH,6ivWdK,frI/1CTECyovykgoPG5xVuy7IjFqUfbHbqyzgi/nU3tVi,igs+rqL6"`
+	Algorithms string `json:"algorithms" required:"true" help:"sign type is algorithms,this is required" default:"lHwINjLeqssT28Ym99p5MvR,xvFcxvtqPKCa9Ajf,2ywOP8spKHzfuhZMUYZ9IpsViq0t8vT0,FTBrJism20SHKQ2m2,BHrWJsPwjnr5VeLtOUr2191X9uXhWmt,yu0QgHEjNmDoPNwXN17so2hQlDT83T,OcaMfLMCGZ7oYlvZGIbTqb4U7cCY,jBGGu0GzXOjtCXYwkOBb+c6TZ/Nymv,YLWRjVor2rOuYEL,94wjoPazejyNC+gRpOj+JOm1XXvxa"`
 	// 签名方法2
 	CaptchaSign string `json:"captcha_sign" required:"true" help:"sign type is captcha_sign,this is required"`
 	Timestamp   string `json:"timestamp" required:"true" help:"sign type is captcha_sign,this is required"`
@@ -35,11 +35,11 @@ type ExpertAddition struct {
 	DeviceID      string `json:"device_id"  required:"true" default:"9aa5c268e7bcfc197a9ad88e2fb330e5"`
 	ClientID      string `json:"client_id"  required:"true" default:"ZQL_zwA4qhHcoe_2"`
 	ClientSecret  string `json:"client_secret"  required:"true" default:"Og9Vr1L8Ee6bh0olFxFDRg"`
-	ClientVersion string `json:"client_version"  required:"true" default:"1.05.0.2113"`
+	ClientVersion string `json:"client_version"  required:"true" default:"1.05.0.2115"`
 	PackageName   string `json:"package_name"  required:"true" default:"com.thunder.downloader"`
 
 	//不影响登录,影响下载速度
-	UserAgent         string `json:"user_agent"  required:"true" default:"ANDROID-com.thunder.downloader/1.05.0.2113 netWorkType/4G appid/40 deviceName/Xiaomi_M2004j7ac deviceModel/M2004J7AC OSVersion/12 protocolVersion/301 platformVersion/10 sdkVersion/220200 Oauth2Client/0.9 (Linux 4_14_186-perf-gdcf98eab238b) (JAVA 0)"`
+	UserAgent         string `json:"user_agent"  required:"true" default:"ANDROID-com.thunder.downloader/1.05.0.2115 netWorkType/4G appid/40 deviceName/Xiaomi_M2004j7ac deviceModel/M2004J7AC OSVersion/12 protocolVersion/301 platformVersion/10 sdkVersion/220200 Oauth2Client/0.9 (Linux 4_14_186-perf-gdcf98eab238b) (JAVA 0)"`
 	DownloadUserAgent string `json:"download_user_agent"  required:"true" default:"Dalvik/2.1.0 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)"`
 
 	//优先使用视频链接代替下载链接

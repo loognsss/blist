@@ -43,22 +43,23 @@ func (x *ThunderX) Init(ctx context.Context) (err error) {
 			Common: &Common{
 				client: base.NewRestyClient(),
 				Algorithms: []string{
-					"stjLXtWsNE",
-					"/fuCv/4LUckQuGTLp6HCq1UIwULc4tWCmdhzIXNWbxWaL95",
-					"ckSvOerpXpG26F1zUmY8N5ideJVnRcufy",
-					"sCxoJ2TpD1UCbaU/n323sF3IPeUDbXjue",
-					"+Fe3cJiip5KjIXjLTFNwyhR7Nmh47ZBfxI4zPnMvtxLQqX1hO",
-					"iGwJ8Knqt4jXudQTt8PH",
-					"6ivWdK",
-					"frI/1CTECyovykgoPG5xVuy7IjFqUfbHbqyzgi/nU3tVi",
-					"igs+rqL6",
+					"lHwINjLeqssT28Ym99p5MvR",
+					"xvFcxvtqPKCa9Ajf",
+					"2ywOP8spKHzfuhZMUYZ9IpsViq0t8vT0",
+					"FTBrJism20SHKQ2m2",
+					"BHrWJsPwjnr5VeLtOUr2191X9uXhWmt",
+					"yu0QgHEjNmDoPNwXN17so2hQlDT83T",
+					"OcaMfLMCGZ7oYlvZGIbTqb4U7cCY",
+					"jBGGu0GzXOjtCXYwkOBb+c6TZ/Nymv",
+					"YLWRjVor2rOuYEL",
+					"94wjoPazejyNC+gRpOj+JOm1XXvxa",
 				},
 				DeviceID:          utils.GetMD5EncodeStr(x.Username + x.Password),
 				ClientID:          "ZQL_zwA4qhHcoe_2",
 				ClientSecret:      "Og9Vr1L8Ee6bh0olFxFDRg",
-				ClientVersion:     "1.05.0.2113",
+				ClientVersion:     "1.05.0.2115",
 				PackageName:       "com.thunder.downloader",
-				UserAgent:         "ANDROID-com.thunder.downloader/1.05.0.2113 netWorkType/5G appid/40 deviceName/Xiaomi_M2004j7ac deviceModel/M2004J7AC OSVersion/12 protocolVersion/301 platformVersion/10 sdkVersion/220200 Oauth2Client/0.9 (Linux 4_14_186-perf-gddfs8vbb238b) (JAVA 0)",
+				UserAgent:         "ANDROID-com.thunder.downloader/1.05.0.2115 netWorkType/5G appid/40 deviceName/Xiaomi_M2004j7ac deviceModel/M2004J7AC OSVersion/12 protocolVersion/301 platformVersion/10 sdkVersion/220200 Oauth2Client/0.9 (Linux 4_14_186-perf-gddfs8vbb238b) (JAVA 0)",
 				DownloadUserAgent: "Dalvik/2.1.0 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)",
 				UseVideoUrl:       x.UseVideoUrl,
 
@@ -90,6 +91,7 @@ func (x *ThunderX) Init(ctx context.Context) (err error) {
 		x.SetCaptchaToken(ctoekn)
 	}
 	x.XunLeiXCommon.UseVideoUrl = x.UseVideoUrl
+	x.Addition.RootFolderID = x.RootFolderID
 	// 防止重复登录
 	identity := x.GetIdentity()
 	if x.identity != identity || !x.IsLogin() {
@@ -157,7 +159,8 @@ func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
 		if x.CaptchaToken != "" {
 			x.SetCaptchaToken(x.CaptchaToken)
 		}
-
+		x.XunLeiXCommon.UseVideoUrl = x.UseVideoUrl
+		x.ExpertAddition.RootFolderID = x.RootFolderID
 		// 签名方法
 		if x.SignType == "captcha_sign" {
 			x.Common.Timestamp = x.Timestamp
@@ -213,6 +216,7 @@ func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
 		x.XunLeiXCommon.UserAgent = x.UserAgent
 		x.XunLeiXCommon.DownloadUserAgent = x.DownloadUserAgent
 		x.XunLeiXCommon.UseVideoUrl = x.UseVideoUrl
+		x.ExpertAddition.RootFolderID = x.RootFolderID
 	}
 	return nil
 }
