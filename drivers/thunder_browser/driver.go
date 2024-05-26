@@ -1,12 +1,8 @@
-package thunderx
+package thunder_browser
 
 import (
 	"context"
 	"fmt"
-	"github.com/go-resty/resty/v2"
-	"net/http"
-	"strings"
-
 	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/errs"
@@ -18,49 +14,58 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/s3/s3manager"
+	"github.com/go-resty/resty/v2"
+	"net/http"
+	"regexp"
+	"strings"
 )
 
-type ThunderX struct {
-	*XunLeiXCommon
+type ThunderBrowser struct {
+	*XunLeiBrowserCommon
 	model.Storage
 	Addition
 
 	identity string
 }
 
-func (x *ThunderX) Config() driver.Config {
+func (x *ThunderBrowser) Config() driver.Config {
 	return config
 }
 
-func (x *ThunderX) GetAddition() driver.Additional {
+func (x *ThunderBrowser) GetAddition() driver.Additional {
 	return &x.Addition
 }
 
-func (x *ThunderX) Init(ctx context.Context) (err error) {
+func (x *ThunderBrowser) Init(ctx context.Context) (err error) {
 	// 初始化所需参数
-	if x.XunLeiXCommon == nil {
-		x.XunLeiXCommon = &XunLeiXCommon{
+	if x.XunLeiBrowserCommon == nil {
+		x.XunLeiBrowserCommon = &XunLeiBrowserCommon{
 			Common: &Common{
 				client: base.NewRestyClient(),
 				Algorithms: []string{
-					"lHwINjLeqssT28Ym99p5MvR",
-					"xvFcxvtqPKCa9Ajf",
-					"2ywOP8spKHzfuhZMUYZ9IpsViq0t8vT0",
-					"FTBrJism20SHKQ2m2",
-					"BHrWJsPwjnr5VeLtOUr2191X9uXhWmt",
-					"yu0QgHEjNmDoPNwXN17so2hQlDT83T",
-					"OcaMfLMCGZ7oYlvZGIbTqb4U7cCY",
-					"jBGGu0GzXOjtCXYwkOBb+c6TZ/Nymv",
-					"YLWRjVor2rOuYEL",
-					"94wjoPazejyNC+gRpOj+JOm1XXvxa",
+					"x+I5XiTByg",
+					"6QU1x5DqGAV3JKg6h",
+					"VI1vL1WXr7st0es",
+					"n+/3yhlrnKs4ewhLgZhZ5ITpt554",
+					"UOip2PE7BLIEov/ZX6VOnsz",
+					"Q70h9lpViNCOC8sGVkar9o22LhBTjfP",
+					"IVHFuB1JcMlaZHnW",
+					"bKE",
+					"HZRbwxOiQx+diNopi6Nu",
+					"fwyasXgYL3rP314331b",
+					"LWxXAiSW4",
+					"UlWIjv1HGrC6Ngmt4Nohx",
+					"FOa+Lc0bxTDpTwIh2",
+					"0+RY",
+					"xmRVMqokHHpvsiH0",
 				},
 				DeviceID:          utils.GetMD5EncodeStr(x.Username + x.Password),
-				ClientID:          "ZQL_zwA4qhHcoe_2",
-				ClientSecret:      "Og9Vr1L8Ee6bh0olFxFDRg",
-				ClientVersion:     "1.05.0.2115",
-				PackageName:       "com.thunder.downloader",
-				UserAgent:         "ANDROID-com.thunder.downloader/1.05.0.2115 netWorkType/5G appid/40 deviceName/Xiaomi_M2004j7ac deviceModel/M2004J7AC OSVersion/12 protocolVersion/301 platformVersion/10 sdkVersion/220200 Oauth2Client/0.9 (Linux 4_14_186-perf-gddfs8vbb238b) (JAVA 0)",
-				DownloadUserAgent: "Dalvik/2.1.0 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)",
+				ClientID:          "ZUBzD9J_XPXfn7f7",
+				ClientSecret:      "yESVmHecEe6F0aou69vl-g",
+				ClientVersion:     "1.0.7.1938",
+				PackageName:       "com.xunlei.browser",
+				UserAgent:         "ANDROID-com.xunlei.browser/1.0.7.1938 netWorkType/5G appid/22062 deviceName/Xiaomi_M2004j7ac deviceModel/M2004J7AC OSVersion/12 protocolVersion/301 platformVersion/10 sdkVersion/233100 Oauth2Client/0.9 (Linux 4_14_186-perf-gddfs8vbb238b) (JAVA 0)",
+				DownloadUserAgent: "AndroidDownloadManager/12 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)",
 				UseVideoUrl:       x.UseVideoUrl,
 
 				refreshCTokenCk: func(token string) {
@@ -90,7 +95,7 @@ func (x *ThunderX) Init(ctx context.Context) (err error) {
 	if ctoekn != "" {
 		x.SetCaptchaToken(ctoekn)
 	}
-	x.XunLeiXCommon.UseVideoUrl = x.UseVideoUrl
+	x.XunLeiBrowserCommon.UseVideoUrl = x.UseVideoUrl
 	x.Addition.RootFolderID = x.RootFolderID
 	// 防止重复登录
 	identity := x.GetIdentity()
@@ -106,32 +111,32 @@ func (x *ThunderX) Init(ctx context.Context) (err error) {
 	return nil
 }
 
-func (x *ThunderX) Drop(ctx context.Context) error {
+func (x *ThunderBrowser) Drop(ctx context.Context) error {
 	return nil
 }
 
-type ThunderXExpert struct {
-	*XunLeiXCommon
+type ThunderBrowserExpert struct {
+	*XunLeiBrowserCommon
 	model.Storage
 	ExpertAddition
 
 	identity string
 }
 
-func (x *ThunderXExpert) Config() driver.Config {
+func (x *ThunderBrowserExpert) Config() driver.Config {
 	return configExpert
 }
 
-func (x *ThunderXExpert) GetAddition() driver.Additional {
+func (x *ThunderBrowserExpert) GetAddition() driver.Additional {
 	return &x.ExpertAddition
 }
 
-func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
+func (x *ThunderBrowserExpert) Init(ctx context.Context) (err error) {
 	// 防止重复登录
 	identity := x.GetIdentity()
 	if identity != x.identity || !x.IsLogin() {
 		x.identity = identity
-		x.XunLeiXCommon = &XunLeiXCommon{
+		x.XunLeiBrowserCommon = &XunLeiBrowserCommon{
 			Common: &Common{
 				client: base.NewRestyClient(),
 
@@ -159,7 +164,7 @@ func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
 		if x.CaptchaToken != "" {
 			x.SetCaptchaToken(x.CaptchaToken)
 		}
-		x.XunLeiXCommon.UseVideoUrl = x.UseVideoUrl
+		x.XunLeiBrowserCommon.UseVideoUrl = x.UseVideoUrl
 		x.ExpertAddition.RootFolderID = x.RootFolderID
 		// 签名方法
 		if x.SignType == "captcha_sign" {
@@ -172,7 +177,7 @@ func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
 		// 登录方式
 		if x.LoginType == "refresh_token" {
 			// 通过RefreshToken登录
-			token, err := x.XunLeiXCommon.RefreshToken(x.ExpertAddition.RefreshToken)
+			token, err := x.XunLeiBrowserCommon.RefreshToken(x.ExpertAddition.RefreshToken)
 			if err != nil {
 				return err
 			}
@@ -180,7 +185,7 @@ func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
 
 			// 刷新token方法
 			x.SetRefreshTokenFunc(func() error {
-				token, err := x.XunLeiXCommon.RefreshToken(x.TokenResp.RefreshToken)
+				token, err := x.XunLeiBrowserCommon.RefreshToken(x.TokenResp.RefreshToken)
 				if err != nil {
 					x.GetStorage().SetStatus(fmt.Sprintf("%+v", err.Error()))
 				}
@@ -196,7 +201,7 @@ func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
 			}
 			x.SetTokenResp(token)
 			x.SetRefreshTokenFunc(func() error {
-				token, err := x.XunLeiXCommon.RefreshToken(x.TokenResp.RefreshToken)
+				token, err := x.XunLeiBrowserCommon.RefreshToken(x.TokenResp.RefreshToken)
 				if err != nil {
 					token, err = x.Login(x.Username, x.Password)
 					if err != nil {
@@ -213,41 +218,54 @@ func (x *ThunderXExpert) Init(ctx context.Context) (err error) {
 		if x.CaptchaToken != "" {
 			x.SetCaptchaToken(x.CaptchaToken)
 		}
-		x.XunLeiXCommon.UserAgent = x.UserAgent
-		x.XunLeiXCommon.DownloadUserAgent = x.DownloadUserAgent
-		x.XunLeiXCommon.UseVideoUrl = x.UseVideoUrl
+		x.XunLeiBrowserCommon.UserAgent = x.UserAgent
+		x.XunLeiBrowserCommon.DownloadUserAgent = x.DownloadUserAgent
+		x.XunLeiBrowserCommon.UseVideoUrl = x.UseVideoUrl
 		x.ExpertAddition.RootFolderID = x.RootFolderID
 	}
 	return nil
 }
 
-func (x *ThunderXExpert) Drop(ctx context.Context) error {
+func (x *ThunderBrowserExpert) Drop(ctx context.Context) error {
 	return nil
 }
 
-func (x *ThunderXExpert) SetTokenResp(token *TokenResp) {
-	x.XunLeiXCommon.SetTokenResp(token)
+func (x *ThunderBrowserExpert) SetTokenResp(token *TokenResp) {
+	x.XunLeiBrowserCommon.SetTokenResp(token)
 	if token != nil {
 		x.ExpertAddition.RefreshToken = token.RefreshToken
 	}
 }
 
-type XunLeiXCommon struct {
+type XunLeiBrowserCommon struct {
 	*Common
 	*TokenResp // 登录信息
 
 	refreshTokenFunc func() error
 }
 
-func (xc *XunLeiXCommon) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
-	return xc.getFiles(ctx, dir.GetID())
+func (xc *XunLeiBrowserCommon) List(ctx context.Context, dir model.Obj, args model.ListArgs) ([]model.Obj, error) {
+	return xc.getFiles(ctx, dir.GetID(), args.ReqPath)
 }
 
-func (xc *XunLeiXCommon) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
+func (xc *XunLeiBrowserCommon) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 	var lFile Files
+
+	// 对 迅雷云盘 内的文件 特殊处理
+	params := map[string]string{
+		"_magic":         "2021",
+		"space":          "SPACE_BROWSER",
+		"thumbnail_size": "SIZE_LARGE",
+		"with":           "url",
+	}
+	if file.GetPath() == "true" {
+		params = map[string]string{}
+	}
+
 	_, err := xc.Request(FILE_API_URL+"/{fileID}", http.MethodGet, func(r *resty.Request) {
 		r.SetContext(ctx)
 		r.SetPathParam("fileID", file.GetID())
+		r.SetQueryParams(params)
 		//r.SetQueryParam("space", "")
 	}, &lFile)
 	if err != nil {
@@ -268,73 +286,136 @@ func (xc *XunLeiXCommon) Link(ctx context.Context, file model.Obj, args model.Li
 			}
 		}
 	}
-
-	/*
-		strs := regexp.MustCompile(`e=([0-9]*)`).FindStringSubmatch(lFile.WebContentLink)
-		if len(strs) == 2 {
-			timestamp, err := strconv.ParseInt(strs[1], 10, 64)
-			if err == nil {
-				expired := time.Duration(timestamp-time.Now().Unix()) * time.Second
-				link.Expiration = &expired
-			}
-		}
-	*/
 	return link, nil
 }
 
-func (xc *XunLeiXCommon) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
-	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
-		r.SetContext(ctx)
-		r.SetBody(&base.Json{
+func (xc *XunLeiBrowserCommon) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
+	js := base.Json{
+		"kind":      FOLDER,
+		"name":      dirName,
+		"parent_id": parentDir.GetID(),
+		"space":     "SPACE_BROWSER",
+	}
+	if parentDir.GetPath() == "true" {
+		js = base.Json{
 			"kind":      FOLDER,
 			"name":      dirName,
 			"parent_id": parentDir.GetID(),
-		})
+		}
+	}
+	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
+		r.SetContext(ctx)
+		r.SetBody(&js)
 	}, nil)
 	return err
 }
 
-func (xc *XunLeiXCommon) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
-	_, err := xc.Request(FILE_API_URL+":batchMove", http.MethodPost, func(r *resty.Request) {
-		r.SetContext(ctx)
-		r.SetBody(&base.Json{
+func (xc *XunLeiBrowserCommon) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
+
+	// 对 迅雷云盘 内的文件 特殊处理
+	params := map[string]string{
+		"_from": "SPACE_BROWSER",
+	}
+	js := base.Json{
+		"to":    base.Json{"parent_id": dstDir.GetID(), "space": "SPACE_BROWSER"},
+		"space": "SPACE_BROWSER",
+		"ids":   []string{srcObj.GetID()},
+	}
+
+	if srcObj.GetPath() == "true" {
+		params = map[string]string{}
+		js = base.Json{
 			"to":  base.Json{"parent_id": dstDir.GetID()},
 			"ids": []string{srcObj.GetID()},
-		})
+		}
+	}
+
+	_, err := xc.Request(FILE_API_URL+":batchMove", http.MethodPost, func(r *resty.Request) {
+		r.SetContext(ctx)
+		r.SetBody(&js)
+		r.SetQueryParams(params)
 	}, nil)
 	return err
 }
 
-func (xc *XunLeiXCommon) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
+func (xc *XunLeiBrowserCommon) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
+
+	// 对 迅雷云盘 内的文件 特殊处理
+	params := map[string]string{
+		"space": "SPACE_BROWSER",
+	}
+
+	if srcObj.GetPath() == "true" {
+		params = map[string]string{}
+	}
+
 	_, err := xc.Request(FILE_API_URL+"/{fileID}", http.MethodPatch, func(r *resty.Request) {
 		r.SetContext(ctx)
 		r.SetPathParam("fileID", srcObj.GetID())
 		r.SetBody(&base.Json{"name": newName})
+		r.SetQueryParams(params)
 	}, nil)
 	return err
 }
 
-func (xc *XunLeiXCommon) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
-	_, err := xc.Request(FILE_API_URL+":batchCopy", http.MethodPost, func(r *resty.Request) {
-		r.SetContext(ctx)
-		r.SetBody(&base.Json{
+func (xc *XunLeiBrowserCommon) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
+	// 对 迅雷云盘 内的文件 特殊处理
+	params := map[string]string{
+		"_from": "SPACE_BROWSER",
+	}
+	js := base.Json{
+		"to":    base.Json{"parent_id": dstDir.GetID(), "space": "SPACE_BROWSER"},
+		"space": "SPACE_BROWSER",
+		"ids":   []string{srcObj.GetID()},
+	}
+
+	if srcObj.GetPath() == "true" {
+		params = map[string]string{}
+		js = base.Json{
 			"to":  base.Json{"parent_id": dstDir.GetID()},
 			"ids": []string{srcObj.GetID()},
-		})
-	}, nil)
-	return err
-}
+		}
+	}
 
-func (xc *XunLeiXCommon) Remove(ctx context.Context, obj model.Obj) error {
-	_, err := xc.Request(FILE_API_URL+"/{fileID}/trash", http.MethodPatch, func(r *resty.Request) {
+	_, err := xc.Request(FILE_API_URL+":batchCopy", http.MethodPost, func(r *resty.Request) {
 		r.SetContext(ctx)
-		r.SetPathParam("fileID", obj.GetID())
-		r.SetBody("{}")
+		r.SetBody(&js)
+		r.SetQueryParams(params)
 	}, nil)
 	return err
 }
 
-func (xc *XunLeiXCommon) Put(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) error {
+func (xc *XunLeiBrowserCommon) Remove(ctx context.Context, obj model.Obj) error {
+	// 对 迅雷云盘 内的文件 特殊处理
+	js := base.Json{
+		"ids":   []string{obj.GetID()},
+		"space": "SPACE_BROWSER",
+	}
+
+	if obj.GetPath() == "true" {
+		js = base.Json{
+			"ids": []string{obj.GetID()},
+		}
+	}
+
+	if xc.RemoveWay == "delete" {
+		_, err := xc.Request(FILE_API_URL+"/{fileID}/trash", http.MethodPatch, func(r *resty.Request) {
+			r.SetContext(ctx)
+			r.SetPathParam("fileID", obj.GetID())
+			r.SetBody("{}")
+		}, nil)
+		return err
+	}
+
+	_, err := xc.Request(FILE_API_URL+":batchTrash", http.MethodPost, func(r *resty.Request) {
+		r.SetContext(ctx)
+		r.SetBody(&js)
+	}, nil)
+	return err
+
+}
+
+func (xc *XunLeiBrowserCommon) Put(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) error {
 	hi := stream.GetHash()
 	gcid := hi.GetHash(hash_extend.GCID)
 	if len(gcid) < hash_extend.GCID.Width {
@@ -349,17 +430,31 @@ func (xc *XunLeiXCommon) Put(ctx context.Context, dstDir model.Obj, stream model
 		}
 	}
 
-	var resp UploadTaskResponse
-	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
-		r.SetContext(ctx)
-		r.SetBody(&base.Json{
+	// 对 迅雷云盘 内的文件 特殊处理
+	js := base.Json{
+		"kind":        FILE,
+		"parent_id":   dstDir.GetID(),
+		"name":        stream.GetName(),
+		"size":        stream.GetSize(),
+		"hash":        gcid,
+		"upload_type": UPLOAD_TYPE_RESUMABLE,
+		"space":       "SPACE_BROWSER",
+	}
+	if dstDir.GetPath() == "true" {
+		js = base.Json{
 			"kind":        FILE,
 			"parent_id":   dstDir.GetID(),
 			"name":        stream.GetName(),
 			"size":        stream.GetSize(),
 			"hash":        gcid,
 			"upload_type": UPLOAD_TYPE_RESUMABLE,
-		})
+		}
+	}
+
+	var resp UploadTaskResponse
+	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
+		r.SetContext(ctx)
+		r.SetBody(&js)
 	}, &resp)
 	if err != nil {
 		return err
@@ -391,14 +486,28 @@ func (xc *XunLeiXCommon) Put(ctx context.Context, dstDir model.Obj, stream model
 	return nil
 }
 
-func (xc *XunLeiXCommon) getFiles(ctx context.Context, folderId string) ([]model.Obj, error) {
+func (xc *XunLeiBrowserCommon) getFiles(ctx context.Context, folderId string, path string) ([]model.Obj, error) {
 	files := make([]model.Obj, 0)
 	var pageToken string
 	for {
 		var fileList FileList
-		_, err := xc.Request(FILE_API_URL, http.MethodGet, func(r *resty.Request) {
-			r.SetContext(ctx)
-			r.SetQueryParams(map[string]string{
+		params := map[string]string{
+			"parent_id":      folderId,
+			"page_token":     pageToken,
+			"space":          "SPACE_BROWSER",
+			"filters":        `{"trashed":{"eq":false}}`,
+			"with_audit":     "true",
+			"thumbnail_size": "SIZE_LARGE",
+		}
+		var IsThunderDriveFolder bool
+		// 处理特殊目录 “迅雷云盘” 设置特殊的 params 以便正常访问
+
+		pattern := fmt.Sprintf(`^/.*/%s(/.*)?$`, ThunderDriveFolderName)
+		match, _ := regexp.MatchString(pattern, path)
+
+		// 如果是 迅雷云盘 内的
+		if folderId == ThunderDriveFileID || match {
+			params = map[string]string{
 				"space":      "",
 				"__type":     "drive",
 				"refresh":    "true",
@@ -408,14 +517,37 @@ func (xc *XunLeiXCommon) getFiles(ctx context.Context, folderId string) ([]model
 				"with_audit": "true",
 				"limit":      "100",
 				"filters":    `{"phase":{"eq":"PHASE_TYPE_COMPLETE"},"trashed":{"eq":false}}`,
-			})
+			}
+			// 如果不是 迅雷云盘 根目录
+			if folderId == ThunderDriveFileID {
+				params["parent_id"] = ""
+			}
+			IsThunderDriveFolder = true
+		}
+
+		_, err := xc.Request(FILE_API_URL, http.MethodGet, func(r *resty.Request) {
+			r.SetContext(ctx)
+			r.SetQueryParams(params)
 		}, &fileList)
 		if err != nil {
 			return nil, err
 		}
+		// 标记 迅雷网盘内的文件夹
+		if IsThunderDriveFolder {
+			fileList.ThunderDriveFolder = true
+		}
 
 		for i := 0; i < len(fileList.Files); i++ {
-			files = append(files, &fileList.Files[i])
+			file := &fileList.Files[i]
+			// 标记 迅雷网盘内的文件
+			if fileList.ThunderDriveFolder {
+				file.ThunderDriveFolder = true
+			}
+			// 处理特殊目录 “迅雷云盘” 设置特殊的文件夹ID
+			if file.Name == "迅雷云盘" && file.ID == "" {
+				file.ID = ThunderDriveFileID
+			}
+			files = append(files, file)
 		}
 
 		if fileList.NextPageToken == "" {
@@ -426,18 +558,18 @@ func (xc *XunLeiXCommon) getFiles(ctx context.Context, folderId string) ([]model
 	return files, nil
 }
 
-// 设置刷新Token的方法
-func (xc *XunLeiXCommon) SetRefreshTokenFunc(fn func() error) {
+// SetRefreshTokenFunc 设置刷新Token的方法
+func (xc *XunLeiBrowserCommon) SetRefreshTokenFunc(fn func() error) {
 	xc.refreshTokenFunc = fn
 }
 
-// 设置Token
-func (xc *XunLeiXCommon) SetTokenResp(tr *TokenResp) {
+// SetTokenResp 设置Token
+func (xc *XunLeiBrowserCommon) SetTokenResp(tr *TokenResp) {
 	xc.TokenResp = tr
 }
 
-// 携带Authorization和CaptchaToken的请求
-func (xc *XunLeiXCommon) Request(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
+// Request 携带Authorization和CaptchaToken的请求
+func (xc *XunLeiBrowserCommon) Request(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	data, err := xc.Common.Request(url, method, func(req *resty.Request) {
 		req.SetHeaders(map[string]string{
 			"Authorization":   xc.Token(),
@@ -474,7 +606,7 @@ func (xc *XunLeiXCommon) Request(url string, method string, callback base.ReqCal
 }
 
 // 刷新Token
-func (xc *XunLeiXCommon) RefreshToken(refreshToken string) (*TokenResp, error) {
+func (xc *XunLeiBrowserCommon) RefreshToken(refreshToken string) (*TokenResp, error) {
 	var resp TokenResp
 	_, err := xc.Common.Request(XLUSER_API_URL+"/auth/token", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(&base.Json{
@@ -495,7 +627,7 @@ func (xc *XunLeiXCommon) RefreshToken(refreshToken string) (*TokenResp, error) {
 }
 
 // 登录
-func (xc *XunLeiXCommon) Login(username, password string) (*TokenResp, error) {
+func (xc *XunLeiBrowserCommon) Login(username, password string) (*TokenResp, error) {
 	url := XLUSER_API_URL + "/auth/signin"
 	err := xc.RefreshCaptchaTokenInLogin(GetAction(http.MethodPost, url), username)
 	if err != nil {
@@ -515,11 +647,10 @@ func (xc *XunLeiXCommon) Login(username, password string) (*TokenResp, error) {
 	if err != nil {
 		return nil, err
 	}
-	resp.UserID = resp.Sub
 	return &resp, nil
 }
 
-func (xc *XunLeiXCommon) IsLogin() bool {
+func (xc *XunLeiBrowserCommon) IsLogin() bool {
 	if xc.TokenResp == nil {
 		return false
 	}
