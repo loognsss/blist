@@ -54,10 +54,17 @@ type TokenResp struct {
 
 	Sub    string `json:"sub"`
 	UserID string `json:"user_id"`
+
+	Token string `json:"token"` // "超级保险箱" 访问Token
 }
 
-func (t *TokenResp) Token() string {
+func (t *TokenResp) GetToken() string {
 	return fmt.Sprint(t.TokenType, " ", t.AccessToken)
+}
+
+// GetSpaceToken 获取"超级保险箱" 访问Token
+func (t *TokenResp) GetSpaceToken() string {
+	return t.Token
 }
 
 type SignInRequest struct {
@@ -74,12 +81,12 @@ type SignInRequest struct {
 * 文件
 **/
 type FileList struct {
-	Kind               string  `json:"kind"`
-	NextPageToken      string  `json:"next_page_token"`
-	Files              []Files `json:"files"`
-	Version            string  `json:"version"`
-	VersionOutdated    bool    `json:"version_outdated"`
-	ThunderDriveFolder bool
+	Kind            string  `json:"kind"`
+	NextPageToken   string  `json:"next_page_token"`
+	Files           []Files `json:"files"`
+	Version         string  `json:"version"`
+	VersionOutdated bool    `json:"version_outdated"`
+	FolderType      int8
 }
 
 type Link struct {
@@ -149,9 +156,9 @@ type Files struct {
 	//Space             string `json:"space"`
 	//Apps              []interface{} `json:"apps"`
 	//Writable   bool   `json:"writable"`
-	//FolderType string `json:"folder_type"`
+	FolderType string `json:"folder_type"`
 	//Collection interface{} `json:"collection"`
-	ThunderDriveFolder bool
+	FileType int8
 }
 
 func (c *Files) GetHash() utils.HashInfo {
@@ -165,9 +172,11 @@ func (c *Files) ModTime() time.Time    { return c.ModifiedTime.Time }
 func (c *Files) IsDir() bool           { return c.Kind == FOLDER }
 func (c *Files) GetID() string         { return c.ID }
 func (c *Files) GetPath() string {
-	// 特殊修改
-	if c.ThunderDriveFolder {
-		return "true"
+	// 对特殊文件进行特殊处理
+	if c.FileType == ThunderDriveType {
+		return ThunderDriveFileID
+	} else if c.FileType == ThunderBrowserDriveSafeType {
+		return ThunderBrowserDriveSafeFileID
 	}
 	return ""
 }

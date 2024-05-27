@@ -1,6 +1,7 @@
 package thunder_browser
 
 import (
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
@@ -34,8 +35,14 @@ const (
 )
 
 const (
-	ThunderDriveFileID     = "XXXXXXXXXXXXXXXXXXXXXXXXXX"
-	ThunderDriveFolderName = "迅雷云盘"
+	ThunderDriveFileID                = "XXXXXXXXXXXXXXXXXXXXXXXXXX"
+	ThunderBrowserDriveSafeFileID     = "YYYYYYYYYYYYYYYYYYYYYYYYYY"
+	ThunderDriveFolderName            = "迅雷云盘"
+	ThunderBrowserDriveSafeFolderName = "超级保险箱"
+	ThunderDriveType                  = 1
+	ThunderBrowserDriveSafeType       = 2
+	ThunderDriveFolderType            = "DEFAULT_ROOT"
+	ThunderBrowserDriveSafeFolderType = "BROWSER_SAFE"
 )
 
 func GetAction(method string, url string) string {
@@ -226,4 +233,17 @@ func (ct *CustomTime) UnmarshalJSON(b []byte) error {
 	}
 	*ct = CustomTime{Time: t}
 	return nil
+}
+
+// EncryptPassword 超级保险箱 加密
+func EncryptPassword(password string) string {
+	if password == "" {
+		return ""
+	}
+	// 将字符串转换为字节数组
+	byteData := []byte(password)
+	// 计算MD5哈希值
+	hash := md5.Sum(byteData)
+	// 将哈希值转换为十六进制字符串
+	return hex.EncodeToString(hash[:])
 }

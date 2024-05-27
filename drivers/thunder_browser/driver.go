@@ -37,6 +37,18 @@ func (x *ThunderBrowser) GetAddition() driver.Additional {
 }
 
 func (x *ThunderBrowser) Init(ctx context.Context) (err error) {
+
+	spaceTokenFunc := func() error {
+		// 如果用户未设置 "超级保险柜" 密码 则直接返回
+		if x.SafePassword == "" {
+			return nil
+		}
+		// 通过 GetSafeAccessToken 获取
+		token, err := x.GetSafeAccessToken(x.SafePassword)
+		x.SetSpaceTokenResp(token)
+		return err
+	}
+
 	// 初始化所需参数
 	if x.XunLeiBrowserCommon == nil {
 		x.XunLeiBrowserCommon = &XunLeiBrowserCommon{
@@ -108,6 +120,13 @@ func (x *ThunderBrowser) Init(ctx context.Context) (err error) {
 		}
 		x.SetTokenResp(token)
 	}
+
+	// 获取 spaceToken
+	err = spaceTokenFunc()
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -132,6 +151,18 @@ func (x *ThunderBrowserExpert) GetAddition() driver.Additional {
 }
 
 func (x *ThunderBrowserExpert) Init(ctx context.Context) (err error) {
+
+	spaceTokenFunc := func() error {
+		// 如果用户未设置 "超级保险柜" 密码 则直接返回
+		if x.SafePassword == "" {
+			return nil
+		}
+		// 通过 GetSafeAccessToken 获取
+		token, err := x.GetSafeAccessToken(x.SafePassword)
+		x.SetSpaceTokenResp(token)
+		return err
+	}
+
 	// 防止重复登录
 	identity := x.GetIdentity()
 	if identity != x.identity || !x.IsLogin() {
@@ -193,6 +224,12 @@ func (x *ThunderBrowserExpert) Init(ctx context.Context) (err error) {
 				op.MustSaveDriverStorage(x)
 				return err
 			})
+
+			err = spaceTokenFunc()
+			if err != nil {
+				return err
+			}
+
 		} else {
 			// 通过用户密码登录
 			token, err := x.Login(x.Username, x.Password)
@@ -212,17 +249,29 @@ func (x *ThunderBrowserExpert) Init(ctx context.Context) (err error) {
 				op.MustSaveDriverStorage(x)
 				return err
 			})
+
+			err = spaceTokenFunc()
+			if err != nil {
+				return err
+			}
 		}
 	} else {
 		// 仅修改验证码token
 		if x.CaptchaToken != "" {
 			x.SetCaptchaToken(x.CaptchaToken)
 		}
+
+		err = spaceTokenFunc()
+		if err != nil {
+			return err
+		}
+
 		x.XunLeiBrowserCommon.UserAgent = x.UserAgent
 		x.XunLeiBrowserCommon.DownloadUserAgent = x.DownloadUserAgent
 		x.XunLeiBrowserCommon.UseVideoUrl = x.UseVideoUrl
 		x.ExpertAddition.RootFolderID = x.RootFolderID
 	}
+
 	return nil
 }
 
@@ -251,15 +300,18 @@ func (xc *XunLeiBrowserCommon) List(ctx context.Context, dir model.Obj, args mod
 func (xc *XunLeiBrowserCommon) Link(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 	var lFile Files
 
-	// 对 迅雷云盘 内的文件 特殊处理
 	params := map[string]string{
 		"_magic":         "2021",
 		"space":          "SPACE_BROWSER",
 		"thumbnail_size": "SIZE_LARGE",
 		"with":           "url",
 	}
-	if file.GetPath() == "true" {
+	// 对 "迅雷云盘" 内的文件 特殊处理
+	if file.GetPath() == ThunderDriveFileID {
 		params = map[string]string{}
+	} else if file.GetPath() == ThunderBrowserDriveSafeFileID {
+		// 对 "超级保险箱" 内的文件 特殊处理
+		params["space"] = "SPACE_BROWSER_SAFE"
 	}
 
 	_, err := xc.Request(FILE_API_URL+"/{fileID}", http.MethodGet, func(r *resty.Request) {
@@ -296,11 +348,18 @@ func (xc *XunLeiBrowserCommon) MakeDir(ctx context.Context, parentDir model.Obj,
 		"parent_id": parentDir.GetID(),
 		"space":     "SPACE_BROWSER",
 	}
-	if parentDir.GetPath() == "true" {
+	if parentDir.GetPath() == ThunderDriveFileID {
 		js = base.Json{
 			"kind":      FOLDER,
 			"name":      dirName,
 			"parent_id": parentDir.GetID(),
+		}
+	} else if parentDir.GetPath() == ThunderBrowserDriveSafeFileID {
+		js = base.Json{
+			"kind":      FOLDER,
+			"name":      dirName,
+			"parent_id": parentDir.GetID(),
+			"space":     "SPACE_BROWSER_SAFE",
 		}
 	}
 	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
@@ -312,17 +371,27 @@ func (xc *XunLeiBrowserCommon) MakeDir(ctx context.Context, parentDir model.Obj,
 
 func (xc *XunLeiBrowserCommon) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 
-	// 对 迅雷云盘 内的文件 特殊处理
-	params := map[string]string{
-		"_from": "SPACE_BROWSER",
+	srcSpace := "SPACE_BROWSER"
+	dstSpace := "SPACE_BROWSER"
+
+	// 对 "超级保险箱" 内的文件 特殊处理
+	if srcObj.GetPath() == ThunderBrowserDriveSafeFileID {
+		srcSpace = "SPACE_BROWSER_SAFE"
 	}
-	js := base.Json{
-		"to":    base.Json{"parent_id": dstDir.GetID(), "space": "SPACE_BROWSER"},
-		"space": "SPACE_BROWSER",
-		"ids":   []string{srcObj.GetID()},
+	if dstDir.GetPath() == ThunderBrowserDriveSafeFileID {
+		dstSpace = "SPACE_BROWSER_SAFE"
 	}
 
-	if srcObj.GetPath() == "true" {
+	params := map[string]string{
+		"_from": dstSpace,
+	}
+	js := base.Json{
+		"to":    base.Json{"parent_id": dstDir.GetID(), "space": dstSpace},
+		"space": srcSpace,
+		"ids":   []string{srcObj.GetID()},
+	}
+	// 对 "迅雷云盘" 内的文件 特殊处理
+	if srcObj.GetPath() == ThunderDriveFileID {
 		params = map[string]string{}
 		js = base.Json{
 			"to":  base.Json{"parent_id": dstDir.GetID()},
@@ -340,13 +409,17 @@ func (xc *XunLeiBrowserCommon) Move(ctx context.Context, srcObj, dstDir model.Ob
 
 func (xc *XunLeiBrowserCommon) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
 
-	// 对 迅雷云盘 内的文件 特殊处理
 	params := map[string]string{
 		"space": "SPACE_BROWSER",
 	}
-
-	if srcObj.GetPath() == "true" {
+	// 对 "迅雷云盘" 内的文件 特殊处理
+	if srcObj.GetPath() == ThunderDriveFileID {
 		params = map[string]string{}
+	} else if srcObj.GetPath() == ThunderBrowserDriveSafeFileID {
+		// 对 "超级保险箱" 内的文件 特殊处理
+		params = map[string]string{
+			"space": "SPACE_BROWSER_SAFE",
+		}
 	}
 
 	_, err := xc.Request(FILE_API_URL+"/{fileID}", http.MethodPatch, func(r *resty.Request) {
@@ -359,17 +432,28 @@ func (xc *XunLeiBrowserCommon) Rename(ctx context.Context, srcObj model.Obj, new
 }
 
 func (xc *XunLeiBrowserCommon) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
-	// 对 迅雷云盘 内的文件 特殊处理
-	params := map[string]string{
-		"_from": "SPACE_BROWSER",
+
+	srcSpace := "SPACE_BROWSER"
+	dstSpace := "SPACE_BROWSER"
+
+	// 对 "超级保险箱" 内的文件 特殊处理
+	if srcObj.GetPath() == ThunderBrowserDriveSafeFileID {
+		srcSpace = "SPACE_BROWSER_SAFE"
 	}
-	js := base.Json{
-		"to":    base.Json{"parent_id": dstDir.GetID(), "space": "SPACE_BROWSER"},
-		"space": "SPACE_BROWSER",
-		"ids":   []string{srcObj.GetID()},
+	if dstDir.GetPath() == ThunderBrowserDriveSafeFileID {
+		dstSpace = "SPACE_BROWSER_SAFE"
 	}
 
-	if srcObj.GetPath() == "true" {
+	params := map[string]string{
+		"_from": dstSpace,
+	}
+	js := base.Json{
+		"to":    base.Json{"parent_id": dstDir.GetID(), "space": dstSpace},
+		"space": srcSpace,
+		"ids":   []string{srcObj.GetID()},
+	}
+	// 对 "迅雷云盘" 内的文件 特殊处理
+	if srcObj.GetPath() == ThunderDriveFileID {
 		params = map[string]string{}
 		js = base.Json{
 			"to":  base.Json{"parent_id": dstDir.GetID()},
@@ -386,23 +470,35 @@ func (xc *XunLeiBrowserCommon) Copy(ctx context.Context, srcObj, dstDir model.Ob
 }
 
 func (xc *XunLeiBrowserCommon) Remove(ctx context.Context, obj model.Obj) error {
-	// 对 迅雷云盘 内的文件 特殊处理
+
 	js := base.Json{
 		"ids":   []string{obj.GetID()},
 		"space": "SPACE_BROWSER",
 	}
-
-	if obj.GetPath() == "true" {
+	// 对 "迅雷云盘" 内的文件 特殊处理
+	if obj.GetPath() == ThunderDriveFileID {
 		js = base.Json{
 			"ids": []string{obj.GetID()},
 		}
+	} else if obj.GetPath() == ThunderBrowserDriveSafeFileID {
+		// 对 "超级保险箱" 内的文件 特殊处理
+		js = base.Json{
+			"ids":   []string{obj.GetID()},
+			"space": "SPACE_BROWSER_SAFE",
+		}
 	}
 
-	if xc.RemoveWay == "delete" {
+	if xc.RemoveWay == "delete" && obj.GetPath() == ThunderDriveFileID {
 		_, err := xc.Request(FILE_API_URL+"/{fileID}/trash", http.MethodPatch, func(r *resty.Request) {
 			r.SetContext(ctx)
 			r.SetPathParam("fileID", obj.GetID())
 			r.SetBody("{}")
+		}, nil)
+		return err
+	} else if obj.GetPath() == ThunderBrowserDriveSafeFileID {
+		_, err := xc.Request(FILE_API_URL+":batchDelete", http.MethodPost, func(r *resty.Request) {
+			r.SetContext(ctx)
+			r.SetBody(&js)
 		}, nil)
 		return err
 	}
@@ -430,7 +526,6 @@ func (xc *XunLeiBrowserCommon) Put(ctx context.Context, dstDir model.Obj, stream
 		}
 	}
 
-	// 对 迅雷云盘 内的文件 特殊处理
 	js := base.Json{
 		"kind":        FILE,
 		"parent_id":   dstDir.GetID(),
@@ -440,7 +535,8 @@ func (xc *XunLeiBrowserCommon) Put(ctx context.Context, dstDir model.Obj, stream
 		"upload_type": UPLOAD_TYPE_RESUMABLE,
 		"space":       "SPACE_BROWSER",
 	}
-	if dstDir.GetPath() == "true" {
+	// 对 "迅雷云盘" 内的文件 特殊处理
+	if dstDir.GetPath() == ThunderDriveFileID {
 		js = base.Json{
 			"kind":        FILE,
 			"parent_id":   dstDir.GetID(),
@@ -448,6 +544,17 @@ func (xc *XunLeiBrowserCommon) Put(ctx context.Context, dstDir model.Obj, stream
 			"size":        stream.GetSize(),
 			"hash":        gcid,
 			"upload_type": UPLOAD_TYPE_RESUMABLE,
+		}
+	} else if dstDir.GetPath() == ThunderBrowserDriveSafeFileID {
+		// 对 "超级保险箱" 内的文件 特殊处理
+		js = base.Json{
+			"kind":        FILE,
+			"parent_id":   dstDir.GetID(),
+			"name":        stream.GetName(),
+			"size":        stream.GetSize(),
+			"hash":        gcid,
+			"upload_type": UPLOAD_TYPE_RESUMABLE,
+			"space":       "SPACE_BROWSER_SAFE",
 		}
 	}
 
@@ -491,22 +598,25 @@ func (xc *XunLeiBrowserCommon) getFiles(ctx context.Context, folderId string, pa
 	var pageToken string
 	for {
 		var fileList FileList
+		folderSpace := "SPACE_BROWSER"
 		params := map[string]string{
 			"parent_id":      folderId,
 			"page_token":     pageToken,
-			"space":          "SPACE_BROWSER",
+			"space":          folderSpace,
 			"filters":        `{"trashed":{"eq":false}}`,
 			"with_audit":     "true",
 			"thumbnail_size": "SIZE_LARGE",
 		}
-		var IsThunderDriveFolder bool
+		var fileType int8
 		// 处理特殊目录 “迅雷云盘” 设置特殊的 params 以便正常访问
+		pattern1 := fmt.Sprintf(`^/.*/%s(/.*)?$`, ThunderDriveFolderName)
+		thunderDriveMatch, _ := regexp.MatchString(pattern1, path)
+		// 处理特殊目录 “超级保险箱” 设置特殊的 params 以便正常访问
+		pattern2 := fmt.Sprintf(`^/.*/%s(/.*)?$`, ThunderBrowserDriveSafeFolderName)
+		thunderBrowserDriveSafeMatch, _ := regexp.MatchString(pattern2, path)
 
-		pattern := fmt.Sprintf(`^/.*/%s(/.*)?$`, ThunderDriveFolderName)
-		match, _ := regexp.MatchString(pattern, path)
-
-		// 如果是 迅雷云盘 内的
-		if folderId == ThunderDriveFileID || match {
+		// 如果是 "迅雷云盘" 内的
+		if folderId == ThunderDriveFileID || thunderDriveMatch {
 			params = map[string]string{
 				"space":      "",
 				"__type":     "drive",
@@ -518,11 +628,15 @@ func (xc *XunLeiBrowserCommon) getFiles(ctx context.Context, folderId string, pa
 				"limit":      "100",
 				"filters":    `{"phase":{"eq":"PHASE_TYPE_COMPLETE"},"trashed":{"eq":false}}`,
 			}
-			// 如果不是 迅雷云盘 根目录
+			// 如果不是 "迅雷云盘"的"根目录"
 			if folderId == ThunderDriveFileID {
 				params["parent_id"] = ""
 			}
-			IsThunderDriveFolder = true
+			fileType = ThunderDriveType
+		} else if thunderBrowserDriveSafeMatch {
+			// 如果是 "超级保险箱" 内的
+			fileType = ThunderBrowserDriveSafeType
+			params["space"] = "SPACE_BROWSER_SAFE"
 		}
 
 		_, err := xc.Request(FILE_API_URL, http.MethodGet, func(r *resty.Request) {
@@ -532,20 +646,22 @@ func (xc *XunLeiBrowserCommon) getFiles(ctx context.Context, folderId string, pa
 		if err != nil {
 			return nil, err
 		}
-		// 标记 迅雷网盘内的文件夹
-		if IsThunderDriveFolder {
-			fileList.ThunderDriveFolder = true
-		}
+		// 对文件夹也进行处理
+		fileList.FolderType = fileType
 
 		for i := 0; i < len(fileList.Files); i++ {
 			file := &fileList.Files[i]
-			// 标记 迅雷网盘内的文件
-			if fileList.ThunderDriveFolder {
-				file.ThunderDriveFolder = true
+			// 标记 文件夹内的文件
+			file.FileType = fileList.FolderType
+			// 解决 "迅雷云盘" 重复出现问题————迅雷后端发送错误
+			if file.Name == ThunderDriveFolderName && file.ID == "" && file.FolderType == ThunderDriveFolderType && folderId != "" {
+				continue
 			}
 			// 处理特殊目录 “迅雷云盘” 设置特殊的文件夹ID
-			if file.Name == "迅雷云盘" && file.ID == "" {
+			if file.Name == ThunderDriveFolderName && file.ID == "" && file.FolderType == ThunderDriveFolderType {
 				file.ID = ThunderDriveFileID
+			} else if file.Name == ThunderBrowserDriveSafeFolderName && file.FolderType == ThunderBrowserDriveSafeFolderType {
+				file.FileType = ThunderBrowserDriveSafeType
 			}
 			files = append(files, file)
 		}
@@ -568,12 +684,18 @@ func (xc *XunLeiBrowserCommon) SetTokenResp(tr *TokenResp) {
 	xc.TokenResp = tr
 }
 
+// SetSpaceTokenResp 设置Token
+func (xc *XunLeiBrowserCommon) SetSpaceTokenResp(spaceToken string) {
+	xc.TokenResp.Token = spaceToken
+}
+
 // Request 携带Authorization和CaptchaToken的请求
 func (xc *XunLeiBrowserCommon) Request(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	data, err := xc.Common.Request(url, method, func(req *resty.Request) {
 		req.SetHeaders(map[string]string{
-			"Authorization":   xc.Token(),
-			"X-Captcha-Token": xc.GetCaptchaToken(),
+			"Authorization":         xc.GetToken(),
+			"X-Captcha-Token":       xc.GetCaptchaToken(),
+			"X-Space-Authorization": xc.GetSpaceToken(),
 		})
 		if callback != nil {
 			callback(req)
@@ -595,17 +717,30 @@ func (xc *XunLeiBrowserCommon) Request(url string, method string, callback base.
 			}
 		}
 		return nil, err
-	case 9: // 验证码token过期
-		if err = xc.RefreshCaptchaTokenAtLogin(GetAction(method, url), xc.UserID); err != nil {
-			return nil, err
+	case 9:
+		// space_token 获取失败
+		if errResp.ErrorMsg == "space_token_invalid" {
+			if token, err := xc.GetSafeAccessToken(xc.Token); err != nil {
+				return nil, err
+			} else {
+				xc.SetSpaceTokenResp(token)
+			}
+
 		}
+		if errResp.ErrorMsg == "captcha_invalid" {
+			// 验证码token过期
+			if err = xc.RefreshCaptchaTokenAtLogin(GetAction(method, url), xc.UserID); err != nil {
+				return nil, err
+			}
+		}
+		return nil, err
 	default:
 		return nil, err
 	}
 	return xc.Request(url, method, callback, resp)
 }
 
-// 刷新Token
+// RefreshToken 刷新Token
 func (xc *XunLeiBrowserCommon) RefreshToken(refreshToken string) (*TokenResp, error) {
 	var resp TokenResp
 	_, err := xc.Common.Request(XLUSER_API_URL+"/auth/token", http.MethodPost, func(req *resty.Request) {
@@ -626,7 +761,26 @@ func (xc *XunLeiBrowserCommon) RefreshToken(refreshToken string) (*TokenResp, er
 	return &resp, nil
 }
 
-// 登录
+// GetSafeAccessToken 获取 超级保险柜 AccessToken
+func (xc *XunLeiBrowserCommon) GetSafeAccessToken(safePassword string) (string, error) {
+	var resp TokenResp
+	_, err := xc.Request(XLUSER_API_URL+"/password/check", http.MethodPost, func(req *resty.Request) {
+		req.SetBody(&base.Json{
+			"scene":    "box",
+			"password": EncryptPassword(safePassword),
+		})
+	}, &resp)
+	if err != nil {
+		return "", err
+	}
+
+	if resp.Token == "" {
+		return "", errs.EmptyToken
+	}
+	return resp.Token, nil
+}
+
+// Login 登录
 func (xc *XunLeiBrowserCommon) Login(username, password string) (*TokenResp, error) {
 	url := XLUSER_API_URL + "/auth/signin"
 	err := xc.RefreshCaptchaTokenInLogin(GetAction(http.MethodPost, url), username)

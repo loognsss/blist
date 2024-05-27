@@ -17,8 +17,9 @@ type ExpertAddition struct {
 	SignType  string `json:"sign_type" type:"select" options:"algorithms,captcha_sign" default:"algorithms"`
 
 	// 登录方式1
-	Username string `json:"username" required:"true" help:"login type is user,this is required"`
-	Password string `json:"password" required:"true" help:"login type is user,this is required"`
+	Username     string `json:"username" required:"true" help:"login type is user,this is required"`
+	Password     string `json:"password" required:"true" help:"login type is user,this is required"`
+	SafePassword string `json:"safe_password" required:"false" help:"login type is user,this is required"` // 超级保险箱密码
 	// 登录方式2
 	RefreshToken string `json:"refresh_token" required:"true" help:"login type is refresh_token,this is required"`
 
@@ -75,6 +76,7 @@ type Addition struct {
 	driver.RootID
 	Username     string `json:"username" required:"true"`
 	Password     string `json:"password" required:"true"`
+	SafePassword string `json:"safe_password" required:"false"` // 超级保险箱密码
 	CaptchaToken string `json:"captcha_token"`
 	UseVideoUrl  bool   `json:"use_video_url" default:"true"`
 	RemoveWay    string `json:"remove_way" required:"true" type:"select" options:"trash,delete"`
