@@ -78,7 +78,7 @@ type Addition struct {
 	Password     string `json:"password" required:"true"`
 	SafePassword string `json:"safe_password" required:"false"` // 超级保险箱密码
 	CaptchaToken string `json:"captcha_token"`
-	UseVideoUrl  bool   `json:"use_video_url" default:"true"`
+	UseVideoUrl  bool   `json:"use_video_url" default:"false"`
 	RemoveWay    string `json:"remove_way" required:"true" type:"select" options:"trash,delete"`
 }
 
