@@ -414,9 +414,9 @@ func GetMD5Hash(text string) string {
 }
 
 const (
-	SmallSliceSize  int64 = 8
-	MediumSliceSize       = 16
-	LargeSliceSize        = 32
+	SmallSliceSize  int64 = 1 * utils.MB
+	MediumSliceSize       = 16 * utils.MB
+	LargeSliceSize        = 32 * utils.MB
 )
 
 func (d *HalalCloud) getSliceSize() int64 {
@@ -424,11 +424,23 @@ func (d *HalalCloud) getSliceSize() int64 {
 		return d.CustomUploadPartSize
 	}
 	switch d.fileStatus {
-	case 1:
+	case 0:
 		return SmallSliceSize
-	case 2:
+	case 1:
 		return MediumSliceSize
-	default:
+	case 2:
 		return LargeSliceSize
+	default:
+		return SmallSliceSize
+	}
+}
+
+func (d *HalalCloud) setFileStatus(fileSize int64) {
+	if fileSize <= 32*utils.MB {
+		d.fileStatus = 0
+	} else if fileSize <= 512*utils.MB {
+		d.fileStatus = 1
+	} else {
+		d.fileStatus = 2
 	}
 }
