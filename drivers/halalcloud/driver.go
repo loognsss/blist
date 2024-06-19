@@ -31,7 +31,7 @@ type HalalCloud struct {
 	Addition
 
 	uploadThread int
-	fileStatus   int // 文件状态 类型，0小文件(8M)、1中型文件(16M)、2大型文件(32M)
+	fileStatus   int // 文件状态 类型，0小文件(1M)、1中型文件(16M)、2大型文件(32M)
 }
 
 func (d *HalalCloud) Config() driver.Config {
@@ -394,16 +394,21 @@ func (d *HalalCloud) put(ctx context.Context, dstDir model.Obj, fileStream model
 	}
 	bosClient.Config.Credentials = stsCredential
 	bosClient.MaxParallel = int64(d.uploadThread)
+
+	d.setFileStatus(fileStream.GetSize()) // 设置文件状态
+
 	bosClient.MultipartSize = d.getSliceSize()
 
-	if fileStream.GetSize() < 100*utils.MB {
-		_, err = bosClient.PutObjectFromStream(result.GetBucket(), fileStream.GetName(), tempFile, nil)
+	if fileStream.GetSize() < 1*utils.MB {
+		partBody, _ := bce.NewBodyFromSizedReader(tempFile, fileStream.GetSize())
+		_, err := bosClient.PutObject(result.Bucket, result.Key, partBody, nil)
+		//_, err = bosClient.PutObjectFromStream(result.GetBucket(), fileStream.GetName(), tempFile, nil)
 		if err != nil {
 			return nil, fmt.Errorf("failed to upload file: %v ===> %s/%s", err, clientConfig.Ak, clientConfig.Sk)
 		}
 		up(100)
 	} else {
-		res, err := bosClient.BasicInitiateMultipartUpload(result.GetBucket(), result.GetAccessKey())
+		res, err := bosClient.BasicInitiateMultipartUpload(result.Bucket, result.Key)
 		// 分块大小按MULTIPART_ALIGN=1MB对齐
 		partSize := (bosClient.MultipartSize +
 			bos.MULTIPART_ALIGN - 1) / bos.MULTIPART_ALIGN * bos.MULTIPART_ALIGN
@@ -433,17 +438,17 @@ func (d *HalalCloud) put(ctx context.Context, dstDir model.Obj, fileStream model
 			partBody, _ := bce.NewBodyFromSizedReader(tempFile, uploadSize)
 
 			// 上传当前分块
-			etag, _ := bosClient.BasicUploadPart(result.GetBucket(), result.GetAccessKey(), res.UploadId, int(i), partBody)
+			etag, _ := bosClient.BasicUploadPart(result.Bucket, result.Key, res.UploadId, int(i), partBody)
 
 			// 保存当前分块上传成功后返回的序号和ETag
-			partEtags = append(partEtags, api.UploadInfoType{int(partNum), etag})
+			partEtags = append(partEtags, api.UploadInfoType{int(i), etag})
 
 			up(float64(i) / float64(partNum) * 100)
 		}
 
 		completeArgs := &api.CompleteMultipartUploadArgs{Parts: partEtags}
 		_, err = bosClient.CompleteMultipartUploadFromStruct(
-			result.GetBucket(), result.GetAccessKey(), res.UploadId, completeArgs)
+			result.Bucket, result.Key, res.UploadId, completeArgs)
 		if err != nil {
 			return nil, err
 		}
