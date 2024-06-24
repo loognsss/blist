@@ -147,6 +147,19 @@ func (d *HalalCloud) NewAuthService(refreshToken string, options ...HalalOption)
 		refreshToken = d.Addition.RefreshToken
 	}
 
+	if len(d.tr.AccessToken) > 0 {
+		accessTokenExpiredAt := d.tr.AccessTokenExpiredAt
+		current := time.Now().UnixMilli()
+		if accessTokenExpiredAt < current {
+			// access token expired
+			d.tr.AccessToken = ""
+			d.tr.AccessTokenExpiredAt = 0
+		} else {
+			svc.tr.AccessTokenExpiredAt = accessTokenExpiredAt
+			svc.tr.AccessToken = d.tr.AccessToken
+		}
+	}
+
 	for _, opt := range options {
 		opt.apply(&svc.dopts)
 	}
@@ -304,23 +317,23 @@ func getRawFiles(addr *pubUserFile.SliceDownloadInfo) ([]byte, error) {
 		}
 	}
 
-	sourceCid, err := cid.Decode(addr.Identity)
-	if err != nil {
-		return nil, err
-	}
-	checkCid, err := sourceCid.Prefix().Sum(body)
-	if err != nil {
-		return nil, err
-	}
-	if !checkCid.Equals(sourceCid) {
-		return nil, fmt.Errorf("bad cid: %s, body: %s", checkCid.String(), body)
+	if addr.StoreType != 10 {
+
+		sourceCid, err := cid.Decode(addr.Identity)
+		if err != nil {
+			return nil, err
+		}
+		checkCid, err := sourceCid.Prefix().Sum(body)
+		if err != nil {
+			return nil, err
+		}
+		if !checkCid.Equals(sourceCid) {
+			return nil, fmt.Errorf("bad cid: %s, body: %s", checkCid.String(), body)
+		}
 	}
 
 	return body, nil
 
-	// Process response body
-
-	// Do something with the response body
 }
 
 // do others that not defined in Driver interface
@@ -332,6 +345,7 @@ type openObject struct {
 	id      int
 	skip    int64
 	chunk   []byte
+	chunks  []chunkSize
 	closed  bool
 	sha     string
 	shaTemp hash.Hash
@@ -339,7 +353,7 @@ type openObject struct {
 
 // get the next chunk
 func (oo *openObject) getChunk(ctx context.Context) (err error) {
-	if oo.id >= len(oo.d) {
+	if oo.id >= len(oo.chunks) {
 		return io.EOF
 	}
 	var chunk []byte
@@ -364,7 +378,11 @@ func (oo *openObject) Read(p []byte) (n int, err error) {
 	}
 	// Skip data at the start if requested
 	for oo.skip > 0 {
-		size := 1024 * 1024
+		//size := 1024 * 1024
+		_, size, err := oo.ChunkLocation(oo.id)
+		if err != nil {
+			return 0, err
+		}
 		if oo.skip < int64(size) {
 			break
 		}
@@ -409,8 +427,8 @@ func (oo *openObject) Close() (err error) {
 }
 
 func GetMD5Hash(text string) string {
-	hash := md5.Sum([]byte(text))
-	return hex.EncodeToString(hash[:])
+	tHash := md5.Sum([]byte(text))
+	return hex.EncodeToString(tHash[:])
 }
 
 const (
@@ -443,4 +461,31 @@ func (d *HalalCloud) setFileStatus(fileSize int64) {
 	} else {
 		d.fileStatus = 2
 	}
+}
+
+// chunkSize describes a size and position of chunk
+type chunkSize struct {
+	position int64
+	size     int
+}
+
+func getChunkSizes(sliceSize []*pubUserFile.SliceSize) (chunks []chunkSize) {
+	for _, s := range sliceSize {
+		// 对最后一个做特殊处理
+		if s.EndIndex == 0 {
+			s.EndIndex = s.StartIndex
+		}
+		for j := s.StartIndex; j <= s.EndIndex; j++ {
+			chunks = append(chunks, chunkSize{position: j, size: int(s.Size)})
+		}
+	}
+	return chunks
+}
+
+func (oo *openObject) ChunkLocation(id int) (position int64, size int, err error) {
+	if id < 0 || id >= len(oo.chunks) {
+		return 0, 0, errors.New("invalid arguments")
+	}
+
+	return oo.chunks[id].position, oo.chunks[id].size, nil
 }

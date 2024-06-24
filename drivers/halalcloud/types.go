@@ -1,14 +1,10 @@
 package halalcloud
 
 import (
-	"context"
 	"github.com/alist-org/alist/v3/internal/model"
-	"github.com/alist-org/alist/v3/pkg/http_range"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/city404/v6-public-rpc-proto/go/v6/common"
-	pubUserFile "github.com/city404/v6-public-rpc-proto/go/v6/userfile"
 	"google.golang.org/grpc"
-	"io"
 	"time"
 )
 
@@ -116,44 +112,6 @@ func (f *Files) GetID() string {
 
 func (f *Files) GetPath() string {
 	return f.Path
-}
-
-type ChunkedRangeReadCloser struct {
-	chunks []*pubUserFile.SliceDownloadInfo // 分片下载地址列表
-	index  int                              // 当前正在读取的分片的索引
-	utils.Closers
-}
-
-func (c *ChunkedRangeReadCloser) RangeReadr(ctx context.Context, httpRange http_range.Range) (io.ReadCloser, error) {
-
-	pipeReader, pipeWriter := io.Pipe()
-
-	// 在一个新的 goroutine 中读取数据
-	go func() {
-		defer c.Closers.Close()
-		defer pipeWriter.Close()
-
-		for _, addr := range c.chunks {
-			// 从分片下载地址下载数据
-			dataBytes, err := tryAndGetRawFiles(addr)
-
-			if err != nil {
-				// 如果下载失败，返回错误
-				pipeWriter.CloseWithError(err)
-				return
-			}
-
-			// 将下载的数据写入管道
-			if _, err := pipeWriter.Write(dataBytes); err != nil {
-				pipeWriter.CloseWithError(err)
-				return
-			}
-		}
-	}()
-
-	// 将管道的读取端作为结果返回
-	c.Closers.Add(pipeReader)
-	return pipeReader, nil
 }
 
 func fileToObj(f Files) *model.ObjThumb {

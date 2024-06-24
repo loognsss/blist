@@ -222,6 +222,7 @@ func (d *HalalCloud) getLink(ctx context.Context, file model.Obj, args model.Lin
 		return nil, err
 	}
 	fileAddrs := []*pubUserFile.SliceDownloadInfo{}
+	var addressDuration int64
 	batchRequest := []string{}
 	for _, slice := range result.RawNodes {
 		batchRequest = append(batchRequest, slice)
@@ -235,6 +236,7 @@ func (d *HalalCloud) getLink(ctx context.Context, file model.Obj, args model.Lin
 			}
 			fileAddrs = append(fileAddrs, sliceAddress.Addresses...)
 			batchRequest = []string{}
+			addressDuration = sliceAddress.ExpireAt
 		}
 	}
 	if len(batchRequest) > 0 {
@@ -260,6 +262,7 @@ func (d *HalalCloud) getLink(ctx context.Context, file model.Obj, args model.Lin
 		oo := &openObject{
 			ctx:     ctx,
 			d:       fileAddrs,
+			chunks:  getChunkSizes(result.Sizes),
 			skip:    httpRange.Start,
 			sha:     result.Sha1,
 			shaTemp: sha1.New(),
@@ -269,7 +272,13 @@ func (d *HalalCloud) getLink(ctx context.Context, file model.Obj, args model.Lin
 		return readers.NewLimitedReadCloser(oo, length), nil
 	}
 
-	duration := time.Until(time.Now().Add(time.Hour))
+	var duration time.Duration
+	if addressDuration != 0 {
+		duration = time.Until(time.UnixMilli(addressDuration))
+	} else {
+		duration = time.Until(time.Now().Add(time.Hour))
+	}
+
 	resultRangeReadCloser := &model.RangeReadCloser{RangeReader: resultRangeReader, Closers: finalClosers}
 	return &model.Link{
 		RangeReadCloser: resultRangeReadCloser,
