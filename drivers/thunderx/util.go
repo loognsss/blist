@@ -1,12 +1,14 @@
 package thunderx
 
 import (
+	"crypto/md5"
 	"crypto/sha1"
 	"encoding/hex"
 	"fmt"
 	"io"
 	"net/http"
 	"regexp"
+	"strings"
 	"time"
 
 	"github.com/alist-org/alist/v3/drivers/base"
@@ -18,6 +20,33 @@ const (
 	API_URL        = "https://api-pan.xunleix.com/drive/v1"
 	FILE_API_URL   = API_URL + "/files"
 	XLUSER_API_URL = "https://xluser-ssl.xunleix.com/v1"
+)
+
+var Algorithms = []string{
+	"IzcnB/ji8O8SE/JiilzZl9qDn9B",
+	"eSTVfCx",
+	"pHhe8E7Agix4ghXOE",
+	"+u",
+	"lHOCwF3Vy84o8uI5XEGFqq/roefG",
+	"MCGSwKZQEGp/ldfe8F",
+	"WA+qjJQoJowdW9MQ4j5N",
+	"X5wtKA/0YmTJxnh5",
+	"fWOAGeXZs/sC7XDF8aRyKjkEJ",
+	"FU5i8SPMcNmEppcfcXJYBd9owjXM",
+	"2YBwM",
+	"epWc3vvH0iaeMrXNeSmzlzgP",
+	"VD3rU",
+	"XAJ",
+	"2BPoWVPReg1VVjJNqOSr7psH",
+}
+
+const (
+	ClientID          = "ZQL_zwA4qhHcoe_2"
+	ClientSecret      = "Og9Vr1L8Ee6bh0olFxFDRg"
+	ClientVersion     = "1.06.0.2131"
+	PackageName       = "com.thunder.downloader"
+	DownloadUserAgent = "Dalvik/2.1.0 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)"
+	SdkVersion        = "2.0.3.203100 "
 )
 
 const (
@@ -42,7 +71,7 @@ type Common struct {
 	client *resty.Client
 
 	captchaToken string
-
+	userID       string
 	// 签名相关,二选一
 	Algorithms             []string
 	Timestamp, CaptchaSign string
@@ -59,6 +88,18 @@ type Common struct {
 
 	// 验证码token刷新成功回调
 	refreshCTokenCk func(token string)
+}
+
+func (c *Common) SetDeviceID(deviceID string) {
+	c.DeviceID = deviceID
+}
+
+func (c *Common) SetUserID(userID string) {
+	c.userID = userID
+}
+
+func (c *Common) SetUserAgent(userAgent string) {
+	c.UserAgent = userAgent
 }
 
 func (c *Common) SetCaptchaToken(captchaToken string) {
@@ -199,4 +240,58 @@ func getGcid(r io.Reader, size int64) (string, error) {
 		hash1.Write(hash2.Sum(nil))
 	}
 	return hex.EncodeToString(hash1.Sum(nil)), nil
+}
+
+func generateDeviceSign(deviceID, packageName string) string {
+
+	signatureBase := fmt.Sprintf("%s%s%s%s", deviceID, packageName, "1", "appkey")
+
+	sha1Hash := sha1.New()
+	sha1Hash.Write([]byte(signatureBase))
+	sha1Result := sha1Hash.Sum(nil)
+
+	sha1String := hex.EncodeToString(sha1Result)
+
+	md5Hash := md5.New()
+	md5Hash.Write([]byte(sha1String))
+	md5Result := md5Hash.Sum(nil)
+
+	md5String := hex.EncodeToString(md5Result)
+
+	deviceSign := fmt.Sprintf("div101.%s%s", deviceID, md5String)
+
+	return deviceSign
+}
+
+func BuildCustomUserAgent(deviceID, clientID, appName, sdkVersion, clientVersion, packageName, userID string) string {
+	deviceSign := generateDeviceSign(deviceID, packageName)
+	var sb strings.Builder
+
+	sb.WriteString(fmt.Sprintf("ANDROID-%s/%s ", appName, clientVersion))
+	sb.WriteString("protocolVersion/200 ")
+	sb.WriteString("accesstype/ ")
+	sb.WriteString(fmt.Sprintf("clientid/%s ", clientID))
+	sb.WriteString(fmt.Sprintf("clientversion/%s ", clientVersion))
+	sb.WriteString("action_type/ ")
+	sb.WriteString("networktype/WIFI ")
+	sb.WriteString("sessionid/ ")
+	sb.WriteString(fmt.Sprintf("deviceid/%s ", deviceID))
+	sb.WriteString("providername/NONE ")
+	sb.WriteString(fmt.Sprintf("devicesign/%s ", deviceSign))
+	sb.WriteString("refresh_token/ ")
+	sb.WriteString(fmt.Sprintf("sdkversion/%s ", sdkVersion))
+	sb.WriteString(fmt.Sprintf("datetime/%d ", time.Now().UnixMilli()))
+	sb.WriteString(fmt.Sprintf("usrno/%s ", userID))
+	sb.WriteString(fmt.Sprintf("appname/%s ", appName))
+	sb.WriteString(fmt.Sprintf("session_origin/ "))
+	sb.WriteString(fmt.Sprintf("grant_type/ "))
+	sb.WriteString(fmt.Sprintf("appid/ "))
+	sb.WriteString(fmt.Sprintf("clientip/ "))
+	sb.WriteString(fmt.Sprintf("devicename/Xiaomi_M2004j7ac "))
+	sb.WriteString(fmt.Sprintf("osversion/13 "))
+	sb.WriteString(fmt.Sprintf("platformversion/10 "))
+	sb.WriteString(fmt.Sprintf("accessmode/ "))
+	sb.WriteString(fmt.Sprintf("devicemodel/M2004J7AC "))
+
+	return sb.String()
 }
