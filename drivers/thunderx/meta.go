@@ -23,7 +23,7 @@ type ExpertAddition struct {
 	RefreshToken string `json:"refresh_token" required:"true" help:"login type is refresh_token,this is required"`
 
 	// 签名方法1
-	Algorithms string `json:"algorithms" required:"true" help:"sign type is algorithms,this is required" default:"IzcnB/ji8O8SE/JiilzZl9qDn9B,eSTVfCx,pHhe8E7Agix4ghXOE,+u,lHOCwF3Vy84o8uI5XEGFqq/roefG,MCGSwKZQEGp/ldfe8F,WA+qjJQoJowdW9MQ4j5N,X5wtKA/0YmTJxnh5,fWOAGeXZs/sC7XDF8aRyKjkEJ,FU5i8SPMcNmEppcfcXJYBd9owjXM,2YBwM,epWc3vvH0iaeMrXNeSmzlzgP,VD3rU,XAJ,2BPoWVPReg1VVjJNqOSr7psH"`
+	Algorithms string `json:"algorithms" required:"true" help:"sign type is algorithms,this is required" default:"kVy0WbPhiE4v6oxXZ88DvoA3Q,lON/AUoZKj8/nBtcE85mVbkOaVdVa,rLGffQrfBKH0BgwQ33yZofvO3Or,FO6HWqw,GbgvyA2,L1NU9QvIQIH7DTRt,y7llk4Y8WfYflt6,iuDp1WPbV3HRZudZtoXChxH4HNVBX5ZALe,8C28RTXmVcco0,X5Xh,7xe25YUgfGgD0xW3ezFS,,CKCR,8EmDjBo6h3eLaK7U6vU2Qys0NsMx,t2TeZBXKqbdP09Arh9C3"`
 	// 签名方法2
 	CaptchaSign string `json:"captcha_sign" required:"true" help:"sign type is captcha_sign,this is required"`
 	Timestamp   string `json:"timestamp" required:"true" help:"sign type is captcha_sign,this is required"`
@@ -35,7 +35,7 @@ type ExpertAddition struct {
 	DeviceID      string `json:"device_id"  required:"false" default:""`
 	ClientID      string `json:"client_id"  required:"true" default:"ZQL_zwA4qhHcoe_2"`
 	ClientSecret  string `json:"client_secret"  required:"true" default:"Og9Vr1L8Ee6bh0olFxFDRg"`
-	ClientVersion string `json:"client_version"  required:"true" default:"1.06.0.2131"`
+	ClientVersion string `json:"client_version"  required:"true" default:"1.06.0.2132"`
 	PackageName   string `json:"package_name"  required:"true" default:"com.thunder.downloader"`
 
 	////不影响登录,影响下载速度

@@ -455,17 +455,17 @@ func (xc *XunLeiXCommon) getFiles(ctx context.Context, folderId string) ([]model
 	return files, nil
 }
 
-// 设置刷新Token的方法
+// SetRefreshTokenFunc 设置刷新Token的方法
 func (xc *XunLeiXCommon) SetRefreshTokenFunc(fn func() error) {
 	xc.refreshTokenFunc = fn
 }
 
-// 设置Token
+// SetTokenResp 设置Token
 func (xc *XunLeiXCommon) SetTokenResp(tr *TokenResp) {
 	xc.TokenResp = tr
 }
 
-// 携带Authorization和CaptchaToken的请求
+// Request 携带Authorization和CaptchaToken的请求
 func (xc *XunLeiXCommon) Request(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	data, err := xc.Common.Request(url, method, func(req *resty.Request) {
 		req.SetHeaders(map[string]string{
@@ -502,7 +502,7 @@ func (xc *XunLeiXCommon) Request(url string, method string, callback base.ReqCal
 	return xc.Request(url, method, callback, resp)
 }
 
-// 刷新Token
+// RefreshToken 刷新Token
 func (xc *XunLeiXCommon) RefreshToken(refreshToken string) (*TokenResp, error) {
 	var resp TokenResp
 	_, err := xc.Common.Request(XLUSER_API_URL+"/auth/token", http.MethodPost, func(req *resty.Request) {
@@ -524,7 +524,7 @@ func (xc *XunLeiXCommon) RefreshToken(refreshToken string) (*TokenResp, error) {
 	return &resp, nil
 }
 
-// 登录
+// Login 登录
 func (xc *XunLeiXCommon) Login(username, password string) (*TokenResp, error) {
 	url := XLUSER_API_URL + "/auth/signin"
 	err := xc.RefreshCaptchaTokenInLogin(GetAction(http.MethodPost, url), username)

@@ -23,29 +23,29 @@ const (
 )
 
 var Algorithms = []string{
-	"IzcnB/ji8O8SE/JiilzZl9qDn9B",
-	"eSTVfCx",
-	"pHhe8E7Agix4ghXOE",
-	"+u",
-	"lHOCwF3Vy84o8uI5XEGFqq/roefG",
-	"MCGSwKZQEGp/ldfe8F",
-	"WA+qjJQoJowdW9MQ4j5N",
-	"X5wtKA/0YmTJxnh5",
-	"fWOAGeXZs/sC7XDF8aRyKjkEJ",
-	"FU5i8SPMcNmEppcfcXJYBd9owjXM",
-	"2YBwM",
-	"epWc3vvH0iaeMrXNeSmzlzgP",
-	"VD3rU",
-	"XAJ",
-	"2BPoWVPReg1VVjJNqOSr7psH",
+	"kVy0WbPhiE4v6oxXZ88DvoA3Q",
+	"lON/AUoZKj8/nBtcE85mVbkOaVdVa",
+	"rLGffQrfBKH0BgwQ33yZofvO3Or",
+	"FO6HWqw",
+	"GbgvyA2",
+	"L1NU9QvIQIH7DTRt",
+	"y7llk4Y8WfYflt6",
+	"iuDp1WPbV3HRZudZtoXChxH4HNVBX5ZALe",
+	"8C28RTXmVcco0",
+	"X5Xh",
+	"7xe25YUgfGgD0xW3ezFS",
+	"",
+	"CKCR",
+	"8EmDjBo6h3eLaK7U6vU2Qys0NsMx",
+	"t2TeZBXKqbdP09Arh9C3",
 }
 
 const (
 	ClientID          = "ZQL_zwA4qhHcoe_2"
 	ClientSecret      = "Og9Vr1L8Ee6bh0olFxFDRg"
-	ClientVersion     = "1.06.0.2131"
+	ClientVersion     = "1.06.0.2132"
 	PackageName       = "com.thunder.downloader"
-	DownloadUserAgent = "Dalvik/2.1.0 (Linux; U; Android 12; M2004J7AC Build/SP1A.210812.016)"
+	DownloadUserAgent = "Dalvik/2.1.0 (Linux; U; Android 13; M2004J7AC Build/SP1A.210812.016)"
 	SdkVersion        = "2.0.3.203100 "
 )
 
@@ -186,7 +186,7 @@ func (c *Common) refreshCaptchaToken(action string, metas map[string]string) err
 	return nil
 }
 
-// 只有基础信息的请求
+// Request 只有基础信息的请求
 func (c *Common) Request(url, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	req := c.client.R().SetHeaders(map[string]string{
 		"user-agent":       c.UserAgent,
