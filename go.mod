@@ -36,6 +36,7 @@ require (
 	github.com/hirochachacha/go-smb2 v1.1.0
 	github.com/ipfs/boxo v0.12.0
 	github.com/ipfs/go-ipfs-api v0.7.0
+	github.com/jinzhu/copier v0.4.0
 	github.com/jlaffaye/ftp v0.2.0
 	github.com/json-iterator/go v1.1.12
 	github.com/larksuite/oapi-sdk-go/v3 v3.2.8
@@ -73,12 +74,13 @@ require (
 	gorm.io/gorm v1.25.10
 )
 
+require github.com/BurntSushi/toml v0.3.1 // indirect
+
 require (
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/blevesearch/go-faiss v1.0.19 // indirect
 	github.com/blevesearch/zapx/v16 v16.1.4 // indirect
 )
-
 require (
 	github.com/Max-Sum/base32768 v0.0.0-20230304063302-18e6ce5945fd // indirect
 	github.com/RoaringBitmap/roaring v1.9.3 // indirect
