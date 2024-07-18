@@ -5,14 +5,13 @@ import (
 	"encoding/hex"
 	"errors"
 	"fmt"
-	"net/http"
-
 	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/dustinxie/ecc"
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
+	"net/http"
 )
 
 func (d *AliDrive) createSession() error {
@@ -35,7 +34,7 @@ func (d *AliDrive) createSession() error {
 			"refreshToken": d.RefreshToken,
 		})
 	}, nil)
-	if err == nil{
+	if err == nil {
 		state.retry = 0
 	}
 	return err
@@ -98,7 +97,7 @@ func (d *AliDrive) request(url, method string, callback base.ReqCallback, resp i
 		"Referer":       "https://alipan.com/",
 		"X-Signature":   state.signature,
 		"x-request-id":  uuid.NewString(),
-		"X-Canary":      "client=Android,app=adrive,version=v4.1.0",
+		"X-Canary":      "client=Android,app=adrive,version=v6.0.1",
 		"X-Device-Id":   state.deviceID,
 	})
 	if callback != nil {
@@ -201,4 +200,33 @@ func (d *AliDrive) batch(srcId, dstId string, url string) error {
 		return nil
 	}
 	return errors.New(string(res))
+}
+
+func (d *AliDrive) getSign(timestamp, nonce string) (string, error) {
+	req := base.RestyClient.R()
+	state, _ := global.Load(d.UserID)
+	data := base.Json{
+		"device_id": state.deviceID,
+		"timestamp": timestamp,
+		"uuid":      nonce,
+	}
+	req.SetBody(data)
+	res, err := req.Execute(http.MethodPost, d.HookAddress+"/encrypt")
+	if err != nil {
+		return "", err
+	}
+	return string(res.Body()), nil
+}
+
+func (d *AliDrive) decryptURL(encryptURL string) (string, error) {
+	req := base.RestyClient.R()
+	data := base.Json{
+		"encrypt_url": encryptURL,
+	}
+	req.SetBody(data)
+	res, err := req.Execute(http.MethodPost, d.HookAddress+"/decrypt")
+	if err != nil {
+		return "", err
+	}
+	return string(res.Body()), nil
 }

@@ -7,6 +7,7 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
+	"github.com/google/uuid"
 	"io"
 	"math"
 	"math/big"
@@ -106,18 +107,46 @@ func (d *AliDrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		"file_id":    file.GetID(),
 		"expire_sec": 14400,
 	}
+	// 从 Flask后端获取 x-sign
+
+	timestamp := fmt.Sprint(time.Now().UnixMilli())
+	nonce := uuid.NewString()
+
+	signV2, _ := d.getSign(timestamp, nonce)
+
 	res, err, _ := d.request("https://api.alipan.com/v2/file/get_download_url", http.MethodPost, func(req *resty.Request) {
+		req.SetHeaders(map[string]string{
+			"x-signature-v2": signV2,
+			"x-nonce":        nonce,
+			"x-timestamp":    timestamp,
+			"User-Agent":     "AliApp(AYSD/6.0.1) com.alicloud.databox/38172215 Channel/36176427979800@rimet_android_6.0.1 language/zh-CN /Android Mobile/samsung samsung+SM-G9810",
+		})
 		req.SetBody(data)
 	}, nil)
 	if err != nil {
 		return nil, err
 	}
-	return &model.Link{
-		Header: http.Header{
-			"Referer": []string{"https://www.alipan.com/"},
-		},
-		URL: utils.Json.Get(res, "url").ToString(),
-	}, nil
+	//str1 := string(res)
+	//fmt.Println(str1)
+	encryptURL := utils.Json.Get(res, "encrypt_url").ToString()
+	if utils.Json.Get(res, "url").ToString() == "" {
+		// 从 Flask后端解密 URL
+		decryptURL, _ := d.decryptURL(encryptURL)
+		return &model.Link{
+			Header: http.Header{
+				"Referer": []string{"https://www.alipan.com/"},
+			},
+			URL: decryptURL,
+		}, nil
+	} else {
+		return &model.Link{
+			Header: http.Header{
+				"Referer": []string{"https://www.alipan.com/"},
+			},
+			URL: utils.Json.Get(res, "url").ToString(),
+		}, nil
+	}
+
 }
 
 func (d *AliDrive) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
