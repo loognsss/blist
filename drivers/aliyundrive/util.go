@@ -1,17 +1,20 @@
 package aliyundrive
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
 	"fmt"
+	"net/http"
+	"time"
+
 	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/dustinxie/ecc"
 	"github.com/go-resty/resty/v2"
 	"github.com/google/uuid"
-	"net/http"
 )
 
 func (d *AliDrive) createSession() error {
@@ -136,6 +139,35 @@ func (d *AliDrive) request(url, method string, callback base.ReqCallback, resp i
 	return res.Body(), nil, e
 }
 
+func (d *AliDrive) requestS(ctx context.Context, url, method string, data interface{}, headers map[string]string) ([]byte, error) {
+	timestamp := fmt.Sprint(time.Now().UnixMilli())
+	nonce := uuid.NewString()
+
+	signV2, err := d.getSign(timestamp, nonce)
+	if err != nil {
+		return nil, err
+	}
+
+	reqHeaders := map[string]string{
+		"x-signature-v2": signV2,
+		"x-nonce":        nonce,
+		"x-timestamp":    timestamp,
+		"User-Agent":     "AliApp(AYSD/6.0.1) com.alicloud.databox/38172215 Channel/36176427979800@rimet_android_6.0.1 language/zh-CN /Android Mobile/samsung samsung+SM-G9810",
+	}
+
+	// Merge additional headers if provided
+	for k, v := range headers {
+		reqHeaders[k] = v
+	}
+
+	res, err, _ := d.request(url, method, func(req *resty.Request) {
+		req.SetHeaders(reqHeaders)
+		req.SetBody(data)
+	}, nil)
+
+	return res, err
+}
+
 func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 	marker := "first"
 	res := make([]File, 0)
@@ -229,4 +261,19 @@ func (d *AliDrive) decryptURL(encryptURL string) (string, error) {
 		return "", err
 	}
 	return string(res.Body()), nil
+}
+
+func (d *AliDrive) refreshDriveId(ctx context.Context) error {
+	infoHeader := map[string]string{
+		"host": "user.alipan.com",
+	}
+	res, err := d.requestS(ctx, "https://bizapi.alipan.com/v2/user/get", http.MethodPost, nil, infoHeader)
+	if err != nil {
+		return err
+	}
+	if err != nil {
+		return err
+	}
+	d.DriveId = utils.Json.Get(res, d.DriveType+"_drive_id").ToString()
+	return nil
 }
