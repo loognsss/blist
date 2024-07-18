@@ -13,6 +13,7 @@ type Addition struct {
 	OrderDirection string `json:"order_direction" type:"select" options:"ASC,DESC"`
 	RapidUpload    bool   `json:"rapid_upload"`
 	InternalUpload bool   `json:"internal_upload"`
+	DriveType      string `json:"drive_type" type:"select" options:"default,resource,backup" default:"default"`
 	HookAddress    string `json:"hook_address"`
 }
 
