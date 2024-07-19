@@ -7,7 +7,6 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"fmt"
-	"github.com/google/uuid"
 	"io"
 	"math"
 	"math/big"
@@ -57,7 +56,6 @@ func (d *AliDrive) Init(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	d.DriveId = utils.Json.Get(res, "default_drive_id").ToString()
 	d.UserID = utils.Json.Get(res, "user_id").ToString()
 	d.cron = cron.NewCron(time.Hour * 2)
 	d.cron.Do(func() {
@@ -67,7 +65,8 @@ func (d *AliDrive) Init(ctx context.Context) error {
 		}
 	})
 	if global.Has(d.UserID) {
-		return nil
+		err = d.refreshDriveId(ctx)
+		return err
 	}
 	// init deviceID
 	deviceID := utils.HashData(utils.SHA256, []byte(d.UserID))
@@ -81,7 +80,8 @@ func (d *AliDrive) Init(ctx context.Context) error {
 	global.Store(d.UserID, &state)
 	// init signature
 	d.sign()
-	return nil
+	err = d.refreshDriveId(ctx)
+	return err
 }
 
 func (d *AliDrive) Drop(ctx context.Context) error {
@@ -107,22 +107,7 @@ func (d *AliDrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		"file_id":    file.GetID(),
 		"expire_sec": 14400,
 	}
-	// 从 Flask后端获取 x-sign
-
-	timestamp := fmt.Sprint(time.Now().UnixMilli())
-	nonce := uuid.NewString()
-
-	signV2, _ := d.getSign(timestamp, nonce)
-
-	res, err, _ := d.request("https://api.alipan.com/v2/file/get_download_url", http.MethodPost, func(req *resty.Request) {
-		req.SetHeaders(map[string]string{
-			"x-signature-v2": signV2,
-			"x-nonce":        nonce,
-			"x-timestamp":    timestamp,
-			"User-Agent":     "AliApp(AYSD/6.0.1) com.alicloud.databox/38172215 Channel/36176427979800@rimet_android_6.0.1 language/zh-CN /Android Mobile/samsung samsung+SM-G9810",
-		})
-		req.SetBody(data)
-	}, nil)
+	res, err := d.requestS(ctx, "https://api.alipan.com/v2/file/get_download_url", http.MethodPost, data, nil)
 	if err != nil {
 		return nil, err
 	}
