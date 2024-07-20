@@ -182,7 +182,6 @@ func (d *HalalCloud) getFiles(ctx context.Context, dir model.Obj) ([]model.Obj, 
 	client := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection())
 
 	opDir := d.GetCurrentDir(dir)
-
 	for {
 		result, err := client.List(ctx, &pubUserFile.FileListRequest{
 			Parent: &pubUserFile.File{Path: opDir},
@@ -317,7 +316,6 @@ func (d *HalalCloud) move(ctx context.Context, obj model.Obj, dir model.Obj) (mo
 func (d *HalalCloud) rename(ctx context.Context, obj model.Obj, name string) (model.Obj, error) {
 	id := obj.GetID()
 	newPath := userfile.NewFormattedPath(d.GetCurrentOpDir(obj, []string{name}, 0)).GetPath()
-
 	_, err := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection()).Rename(ctx, &pubUserFile.File{
 		Path:     newPath,
 		Identity: id,
@@ -368,7 +366,6 @@ func (d *HalalCloud) remove(ctx context.Context, obj model.Obj) error {
 func (d *HalalCloud) put(ctx context.Context, dstDir model.Obj, fileStream model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {
 
 	newDir := path.Join(dstDir.GetPath(), fileStream.GetName())
-
 	result, err := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection()).CreateUploadToken(ctx, &pubUserFile.File{
 		Path: newDir,
 	})
