@@ -107,7 +107,7 @@ func (d *AliDrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		"file_id":    file.GetID(),
 		"expire_sec": 14400,
 	}
-	res, err := d.requestS(ctx, "https://api.alipan.com/v2/file/get_download_url", http.MethodPost, data, nil)
+	res, err, _ := d.requestS("https://api.alipan.com/v2/file/get_download_url", http.MethodPost, data, nil)
 	if err != nil {
 		return nil, err
 	}
