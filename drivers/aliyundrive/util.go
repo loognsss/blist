@@ -102,7 +102,7 @@ func (d *AliDrive) request(url, method string, callback base.ReqCallback, resp i
 		"Referer":       "https://alipan.com/",
 		"X-Signature":   state.signature,
 		"x-request-id":  uuid.NewString(),
-		"X-Canary":      "client=Android,app=adrive,version=v6.0.1",
+		"X-Canary":      d.XCanary,
 		"X-Device-Id":   state.deviceID,
 	})
 	if callback != nil {
@@ -154,7 +154,7 @@ func (d *AliDrive) requestS(url, method string, data interface{}, headers map[st
 		"x-signature-v2": signV2,
 		"x-nonce":        nonce,
 		"x-timestamp":    timestamp,
-		"User-Agent":     "AliApp(AYSD/6.0.1) com.alicloud.databox/38172215 Channel/36176427979800@rimet_android_6.0.1 language/zh-CN /Android Mobile/samsung samsung+SM-G9810",
+		"User-Agent":     d.UserAgent,
 	}
 
 	// Merge additional headers if provided
