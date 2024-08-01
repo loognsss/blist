@@ -3,8 +3,11 @@ package aliyundrive_open
 import (
 	"context"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/deatil/go-cryptobin/cryptobin/crypto"
 	"net/http"
 	"strings"
 	"time"
@@ -242,7 +245,7 @@ func (d *AliyundriveOpen) getRefreshTokenByTV(code string, isRefresh bool) error
 }
 
 func (d *AliyundriveOpen) _getRefreshTokenByTV(code string, isRefresh bool) (refreshToken, accessToken string, err error) {
-	url := "http://api.extscreen.com/aliyundrive/token"
+	url := "http://api.extscreen.com/aliyundrive/v2/token"
 	var resp RefreshTokenAuthResp
 	body := ""
 	if isRefresh {
@@ -259,10 +262,33 @@ func (d *AliyundriveOpen) _getRefreshTokenByTV(code string, isRefresh bool) (ref
 	if err != nil {
 		return "", "", err
 	}
-
-	refresh, access := resp.Data.RefreshToken, resp.Data.AccessToken
+	v, err := _decryptForTV(resp.Data.CipherText, resp.Data.IV)
+	if err != nil {
+		return "", "", err
+	}
+	refresh, access := v.RefreshToken, v.AccessToken
 	if refresh == "" {
 		return "", "", fmt.Errorf("failed to refresh token: refresh token is empty, resp: %s", res.String())
 	}
 	return refresh, access, nil
+}
+
+func _decryptForTV(cipherText, iv string) (*ResData, error) {
+	cipher, err := base64.StdEncoding.DecodeString(cipherText)
+	if err != nil {
+		return nil, err
+	}
+	iV, err := hex.DecodeString(iv)
+	if err != nil {
+		return nil, err
+	}
+	res := crypto.FromBytes(cipher).SetKey("^(i/x>>5(ebyhumz*i1wkpk^orIs^Na.").SetIv(string(iV)).Aes().CBC().PKCS7Padding().Decrypt()
+	fmt.Println(string(res.ToBytes()))
+	fmt.Println(res.Error())
+	v := new(ResData)
+	if err := json.Unmarshal(res.ToBytes(), v); err != nil {
+		return nil, err
+
+	}
+	return v, nil
 }
