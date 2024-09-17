@@ -1,75 +1,52 @@
 package _115
 
 import (
-	"bytes"
-	"crypto/tls"
-	"encoding/json"
 	"fmt"
-	"io"
-	"net/http"
-	"net/url"
-	"path/filepath"
-	"strconv"
-	"strings"
-	"sync"
-	"time"
-
-	"github.com/alist-org/alist/v3/internal/conf"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/pkg/http_range"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/aliyun/aliyun-oss-go-sdk/oss"
+	"github.com/deadblue/elevengo"
+	"strings"
 
-	driver115 "github.com/SheltonZhu/115driver/pkg/driver"
-	crypto "github.com/gaoyb7/115drive-webdav/115"
-	"github.com/orzogc/fake115uploader/cipher"
 	"github.com/pkg/errors"
 )
 
-var UserAgent = driver115.UA115Browser
-
 func (d *Pan115) login() error {
-	var err error
-	opts := []driver115.Option{
-		driver115.UA(UserAgent),
-		func(c *driver115.Pan115Client) {
-			c.Client.SetTLSClientConfig(&tls.Config{InsecureSkipVerify: conf.Conf.TlsInsecureSkipVerify})
-		},
-	}
-	d.client = driver115.New(opts...)
-	cr := &driver115.Credential{}
-	if d.QRCodeToken != "" {
-		s := &driver115.QRCodeSession{
-			UID: d.QRCodeToken,
+	d.client = elevengo.Default()
+
+	if d.Cookie != "" {
+		credential, err := FormCookie(d.Cookie)
+		if err != nil {
+			return err
 		}
-		if cr, err = d.client.QRCodeLoginWithApp(s, driver115.LoginApp(d.QRCodeSource)); err != nil {
-			return errors.Wrap(err, "failed to login by qrcode")
+		if err = d.client.CredentialImport(credential); err != nil {
+			return errors.New("import credential failed")
 		}
-		d.Cookie = fmt.Sprintf("UID=%s;CID=%s;SEID=%s", cr.UID, cr.CID, cr.SEID)
-		d.QRCodeToken = ""
-	} else if d.Cookie != "" {
-		if err = cr.FromCookie(d.Cookie); err != nil {
-			return errors.Wrap(err, "failed to login by cookies")
-		}
-		d.client.ImportCredential(cr)
 	} else {
 		return errors.New("missing cookie or qrcode account")
 	}
-	return d.client.LoginCheck()
+	return nil
 }
 
 func (d *Pan115) getFiles(fileId string) ([]FileObj, error) {
 	res := make([]FileObj, 0)
-	if d.PageSize <= 0 {
+	/*	if d.PageSize <= 0 {
 		d.PageSize = driver115.FileListLimit
-	}
-	files, err := d.client.ListWithLimit(fileId, d.PageSize)
+	}*/
+
+	it, err := d.client.FileIterate(fileId)
 	if err != nil {
 		return nil, err
 	}
-	for _, file := range *files {
-		res = append(res, FileObj{file})
+	for ; err == nil; err = it.Next() {
+		file := &elevengo.File{}
+		if it.Get(file) != nil {
+			continue
+		}
+		res = append(res, FileObj{*file})
 	}
+
 	return res, nil
 }
 
@@ -77,146 +54,147 @@ const (
 	appVer = "2.0.3.6"
 )
 
-func (c *Pan115) DownloadWithUA(pickCode, ua string) (*driver115.DownloadInfo, error) {
-	key := crypto.GenerateKey()
-	result := driver115.DownloadResp{}
-	params, err := utils.Json.Marshal(map[string]string{"pickcode": pickCode})
-	if err != nil {
-		return nil, err
-	}
-
-	data := crypto.Encode(params, key)
-
-	bodyReader := strings.NewReader(url.Values{"data": []string{data}}.Encode())
-	reqUrl := fmt.Sprintf("%s?t=%s", driver115.ApiDownloadGetUrl, driver115.Now().String())
-	req, _ := http.NewRequest(http.MethodPost, reqUrl, bodyReader)
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
-	req.Header.Set("Cookie", c.Cookie)
-	req.Header.Set("User-Agent", ua)
-
-	resp, err := c.client.Client.GetClient().Do(req)
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-	if err := utils.Json.Unmarshal(body, &result); err != nil {
-		return nil, err
-	}
-
-	if err = result.Err(string(body)); err != nil {
-		return nil, err
-	}
-
-	bytes, err := crypto.Decode(string(result.EncodedData), key)
-	if err != nil {
-		return nil, err
-	}
-
-	downloadInfo := driver115.DownloadData{}
-	if err := utils.Json.Unmarshal(bytes, &downloadInfo); err != nil {
-		return nil, err
-	}
-
-	for _, info := range downloadInfo {
-		if info.FileSize < 0 {
-			return nil, driver115.ErrDownloadEmpty
-		}
-		info.Header = resp.Request.Header
-		return info, nil
-	}
-	return nil, driver115.ErrUnexpected
-}
-
-func (d *Pan115) rapidUpload(fileSize int64, fileName, dirID, preID, fileID string, stream model.FileStreamer) (*driver115.UploadInitResp, error) {
-	var (
-		ecdhCipher   *cipher.EcdhCipher
-		encrypted    []byte
-		decrypted    []byte
-		encodedToken string
-		err          error
-		target       = "U_1_" + dirID
-		bodyBytes    []byte
-		result       = driver115.UploadInitResp{}
-		fileSizeStr  = strconv.FormatInt(fileSize, 10)
-	)
-	if ecdhCipher, err = cipher.NewEcdhCipher(); err != nil {
-		return nil, err
-	}
-
-	userID := strconv.FormatInt(d.client.UserID, 10)
-	form := url.Values{}
-	form.Set("appid", "0")
-	form.Set("appversion", appVer)
-	form.Set("userid", userID)
-	form.Set("filename", fileName)
-	form.Set("filesize", fileSizeStr)
-	form.Set("fileid", fileID)
-	form.Set("target", target)
-	form.Set("sig", d.client.GenerateSignature(fileID, target))
-
-	signKey, signVal := "", ""
-	for retry := true; retry; {
-		t := driver115.Now()
-
-		if encodedToken, err = ecdhCipher.EncodeToken(t.ToInt64()); err != nil {
-			return nil, err
-		}
-
-		params := map[string]string{
-			"k_ec": encodedToken,
-		}
-
-		form.Set("t", t.String())
-		form.Set("token", d.client.GenerateToken(fileID, preID, t.String(), fileSizeStr, signKey, signVal))
-		if signKey != "" && signVal != "" {
-			form.Set("sign_key", signKey)
-			form.Set("sign_val", signVal)
-		}
-		if encrypted, err = ecdhCipher.Encrypt([]byte(form.Encode())); err != nil {
-			return nil, err
-		}
-
-		req := d.client.NewRequest().
-			SetQueryParams(params).
-			SetBody(encrypted).
-			SetHeaderVerbatim("Content-Type", "application/x-www-form-urlencoded").
-			SetDoNotParseResponse(true)
-		resp, err := req.Post(driver115.ApiUploadInit)
+/*
+	func (c *Pan115) DownloadWithUA(pickCode, ua string) (*driver115.DownloadInfo, error) {
+		key := crypto.GenerateKey()
+		result := driver115.DownloadResp{}
+		params, err := utils.Json.Marshal(map[string]string{"pickcode": pickCode})
 		if err != nil {
 			return nil, err
 		}
-		data := resp.RawBody()
-		defer data.Close()
-		if bodyBytes, err = io.ReadAll(data); err != nil {
+
+		data := crypto.Encode(params, key)
+
+		bodyReader := strings.NewReader(url.Values{"data": []string{data}}.Encode())
+		reqUrl := fmt.Sprintf("%s?t=%s", driver115.ApiDownloadGetUrl, driver115.Now().String())
+		req, _ := http.NewRequest(http.MethodPost, reqUrl, bodyReader)
+		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+		req.Header.Set("Cookie", c.Cookie)
+		req.Header.Set("User-Agent", ua)
+
+		resp, err := c.client.Client.GetClient().Do(req)
+		if err != nil {
 			return nil, err
 		}
-		if decrypted, err = ecdhCipher.Decrypt(bodyBytes); err != nil {
+		defer resp.Body.Close()
+
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
 			return nil, err
 		}
-		if err = driver115.CheckErr(json.Unmarshal(decrypted, &result), &result, resp); err != nil {
+		if err := utils.Json.Unmarshal(body, &result); err != nil {
 			return nil, err
 		}
-		if result.Status == 7 {
-			// Update signKey & signVal
-			signKey = result.SignKey
-			signVal, err = UploadDigestRange(stream, result.SignCheck)
+
+		if err = result.Err(string(body)); err != nil {
+			return nil, err
+		}
+
+		bytes, err := crypto.Decode(string(result.EncodedData), key)
+		if err != nil {
+			return nil, err
+		}
+
+		downloadInfo := driver115.DownloadData{}
+		if err := utils.Json.Unmarshal(bytes, &downloadInfo); err != nil {
+			return nil, err
+		}
+
+		for _, info := range downloadInfo {
+			if info.FileSize < 0 {
+				return nil, driver115.ErrDownloadEmpty
+			}
+			info.Header = resp.Request.Header
+			return info, nil
+		}
+		return nil, driver115.ErrUnexpected
+	}
+
+	func (d *Pan115) rapidUpload(fileSize int64, fileName, dirID, preID, fileID string, stream model.FileStreamer) (*driver115.UploadInitResp, error) {
+		var (
+			ecdhCipher   *cipher.EcdhCipher
+			encrypted    []byte
+			decrypted    []byte
+			encodedToken string
+			err          error
+			target       = "U_1_" + dirID
+			bodyBytes    []byte
+			result       = driver115.UploadInitResp{}
+			fileSizeStr  = strconv.FormatInt(fileSize, 10)
+		)
+		if ecdhCipher, err = cipher.NewEcdhCipher(); err != nil {
+			return nil, err
+		}
+
+		userID := strconv.FormatInt(d.client.UserID, 10)
+		form := url.Values{}
+		form.Set("appid", "0")
+		form.Set("appversion", appVer)
+		form.Set("userid", userID)
+		form.Set("filename", fileName)
+		form.Set("filesize", fileSizeStr)
+		form.Set("fileid", fileID)
+		form.Set("target", target)
+		form.Set("sig", d.client.GenerateSignature(fileID, target))
+
+		signKey, signVal := "", ""
+		for retry := true; retry; {
+			t := driver115.Now()
+
+			if encodedToken, err = ecdhCipher.EncodeToken(t.ToInt64()); err != nil {
+				return nil, err
+			}
+
+			params := map[string]string{
+				"k_ec": encodedToken,
+			}
+
+			form.Set("t", t.String())
+			form.Set("token", d.client.GenerateToken(fileID, preID, t.String(), fileSizeStr, signKey, signVal))
+			if signKey != "" && signVal != "" {
+				form.Set("sign_key", signKey)
+				form.Set("sign_val", signVal)
+			}
+			if encrypted, err = ecdhCipher.Encrypt([]byte(form.Encode())); err != nil {
+				return nil, err
+			}
+
+			req := d.client.NewRequest().
+				SetQueryParams(params).
+				SetBody(encrypted).
+				SetHeaderVerbatim("Content-Type", "application/x-www-form-urlencoded").
+				SetDoNotParseResponse(true)
+			resp, err := req.Post(driver115.ApiUploadInit)
 			if err != nil {
 				return nil, err
 			}
-		} else {
-			retry = false
+			data := resp.RawBody()
+			defer data.Close()
+			if bodyBytes, err = io.ReadAll(data); err != nil {
+				return nil, err
+			}
+			if decrypted, err = ecdhCipher.Decrypt(bodyBytes); err != nil {
+				return nil, err
+			}
+			if err = driver115.CheckErr(json.Unmarshal(decrypted, &result), &result, resp); err != nil {
+				return nil, err
+			}
+			if result.Status == 7 {
+				// Update signKey & signVal
+				signKey = result.SignKey
+				signVal, err = UploadDigestRange(stream, result.SignCheck)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				retry = false
+			}
+			result.SHA1 = fileID
 		}
-		result.SHA1 = fileID
+
+		return &result, nil
 	}
-
-	return &result, nil
-}
-
+*/
 func UploadDigestRange(stream model.FileStreamer, rangeSpec string) (result string, err error) {
 	var start, end int64
 	if _, err = fmt.Sscanf(rangeSpec, "%d-%d", &start, &end); err != nil {
@@ -234,7 +212,7 @@ func UploadDigestRange(stream model.FileStreamer, rangeSpec string) (result stri
 }
 
 // UploadByMultipart upload by mutipart blocks
-func (d *Pan115) UploadByMultipart(params *driver115.UploadOSSParams, fileSize int64, stream model.FileStreamer, dirID string, opts ...driver115.UploadMultipartOption) error {
+/*func (d *Pan115) UploadByMultipart(params *driver115.UploadOSSParams, fileSize int64, stream model.FileStreamer, dirID string, opts ...driver115.UploadMultipartOption) error {
 	var (
 		chunks    []oss.FileChunk
 		parts     []oss.UploadPart
@@ -370,34 +348,35 @@ LOOP:
 	}
 	return d.checkUploadStatus(dirID, params.SHA1)
 }
-
+*/
 func chunksProducer(ch chan oss.FileChunk, chunks []oss.FileChunk) {
 	for _, chunk := range chunks {
 		ch <- chunk
 	}
 }
 
-func (d *Pan115) checkUploadStatus(dirID, sha1 string) error {
-	// 验证上传是否成功
-	req := d.client.NewRequest().ForceContentType("application/json;charset=UTF-8")
-	opts := []driver115.GetFileOptions{
-		driver115.WithOrder(driver115.FileOrderByTime),
-		driver115.WithShowDirEnable(false),
-		driver115.WithAsc(false),
-		driver115.WithLimit(500),
-	}
-	fResp, err := driver115.GetFiles(req, dirID, opts...)
-	if err != nil {
-		return err
-	}
-	for _, fileInfo := range fResp.Files {
-		if fileInfo.Sha1 == sha1 {
-			return nil
+/*
+	func (d *Pan115) checkUploadStatus(dirID, sha1 string) error {
+		// 验证上传是否成功
+		req := d.client.NewRequest().ForceContentType("application/json;charset=UTF-8")
+		opts := []driver115.GetFileOptions{
+			driver115.WithOrder(driver115.FileOrderByTime),
+			driver115.WithShowDirEnable(false),
+			driver115.WithAsc(false),
+			driver115.WithLimit(500),
 		}
+		fResp, err := driver115.GetFiles(req, dirID, opts...)
+		if err != nil {
+			return err
+		}
+		for _, fileInfo := range fResp.Files {
+			if fileInfo.Sha1 == sha1 {
+				return nil
+			}
+		}
+		return driver115.ErrUploadFailed
 	}
-	return driver115.ErrUploadFailed
-}
-
+*/
 func SplitFile(fileSize int64) (chunks []oss.FileChunk, err error) {
 	for i := int64(1); i < 10; i++ {
 		if fileSize < i*utils.GB { // 文件大小小于iGB时分为i*1000片
@@ -478,4 +457,34 @@ func SplitFileByPartSize(fileSize int64, chunkSize int64) ([]oss.FileChunk, erro
 	}
 
 	return chunks, nil
+}
+
+func FormCookie(cookie string) (resp *elevengo.Credential, err error) {
+	items := strings.Split(cookie, ";")
+	if len(items) < 3 {
+		return resp, errors.Wrap(errors.New("bad cookie"), "number of cookie paris < 3")
+	}
+
+	cookieMap := map[string]string{}
+	for _, item := range items {
+		pairs := strings.Split(strings.TrimSpace(item), "=")
+		if len(pairs) != 2 {
+			return resp, errors.New("bad cookie")
+		}
+		key := pairs[0]
+		value := pairs[1]
+		cookieMap[strings.ToUpper(key)] = value
+	}
+
+	credential := &elevengo.Credential{
+		UID:  cookieMap["UID"],
+		CID:  cookieMap["CID"],
+		SEID: cookieMap["SEID"],
+	}
+
+	if credential.CID == "" || credential.UID == "" || credential.SEID == "" {
+		return resp, errors.Wrap(errors.New("bad cookie"), "bad cookie, miss UID, CID or SEID")
+	}
+
+	return credential, nil
 }

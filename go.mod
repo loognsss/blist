@@ -18,6 +18,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/city404/v6-public-rpc-proto/go v0.0.0-20240817070657-90f8e24b653e
 	github.com/coreos/go-oidc v2.2.1+incompatible
+	github.com/deadblue/elevengo v0.4.6-0.20240807113021-601131b0ac51
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/disintegration/imaging v1.6.2
@@ -73,6 +74,7 @@ require (
 )
 
 require (
+	filippo.io/nistec v0.0.3 // indirect
 	github.com/BurntSushi/toml v0.3.1 // indirect
 	github.com/blevesearch/go-faiss v1.0.20 // indirect
 	github.com/blevesearch/zapx/v16 v16.1.5 // indirect
