@@ -7,12 +7,13 @@ import (
 
 type Addition struct {
 	driver.RootID
-	Username     string `json:"username" required:"true"`
-	Password     string `json:"password" required:"true"`
-	ShareId      string `json:"share_id" required:"true"`
-	SharePwd     string `json:"share_pwd"`
-	ClientID     string `json:"client_id" required:"true" default:"YNxT9w7GMdWvEOKa"`
-	ClientSecret string `json:"client_secret" required:"true" default:"dbw2OtmVEeuUvIptb1Coyg"`
+	ShareId                 string `json:"share_id" required:"true"`
+	SharePwd                string `json:"share_pwd"`
+	Platform                string `json:"platform" required:"true" type:"select" options:"android,web,pc"`
+	DeviceID                string `json:"device_id"  required:"false" default:""`
+	UseTransCodingAddress   bool   `json:"use_transcoding_address" required:"true" default:"false"`
+	UseLowLatencyAddress    bool   `json:"use_low_latency_address" default:"false"`
+	CustomLowLatencyAddress string `json:"custom_low_latency_address" default:""`
 }
 
 var config = driver.Config{

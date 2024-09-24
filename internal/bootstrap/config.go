@@ -68,11 +68,7 @@ func InitConfig() {
 		}
 		conf.Conf.TempDir = absPath
 	}
-	err := os.RemoveAll(filepath.Join(conf.Conf.TempDir))
-	if err != nil {
-		log.Errorln("failed delete temp file:", err)
-	}
-	err = os.MkdirAll(conf.Conf.TempDir, 0o777)
+	err := os.MkdirAll(conf.Conf.TempDir, 0o777)
 	if err != nil {
 		log.Fatalf("create temp dir error: %+v", err)
 	}
@@ -103,4 +99,16 @@ func initURL() {
 		utils.Log.Fatalf("can't parse site_url: %+v", err)
 	}
 	conf.URL = u
+}
+
+func CleanTempDir() {
+	files, err := os.ReadDir(conf.Conf.TempDir)
+	if err != nil {
+		log.Errorln("failed list temp file: ", err)
+	}
+	for _, file := range files {
+		if err := os.RemoveAll(filepath.Join(conf.Conf.TempDir, file.Name())); err != nil {
+			log.Errorln("failed delete temp file: ", err)
+		}
+	}
 }
