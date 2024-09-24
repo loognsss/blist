@@ -29,7 +29,7 @@ func (d *AliDrive) createSession() error {
 		state.retry = 0
 		return fmt.Errorf("createSession failed after three retries")
 	}
-	_, err, _ := d.request("https://api.alipan.com/users/v1/users/device/create_session", http.MethodPost, func(req *resty.Request) {
+	_, err, _ := d.requestS("https://api.alipan.com/users/v1/users/device/create_session", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"deviceName":   "samsung",
 			"modelName":    "SM-G9810",
@@ -37,7 +37,7 @@ func (d *AliDrive) createSession() error {
 			"pubKey":       PublicKeyToHex(&state.privateKey.PublicKey),
 			"refreshToken": d.RefreshToken,
 		})
-	}, nil)
+	}, nil, nil)
 	if err == nil {
 		state.retry = 0
 	}
@@ -45,7 +45,7 @@ func (d *AliDrive) createSession() error {
 }
 
 // func (d *AliDrive) renewSession() error {
-// 	_, err, _ := d.request("https://api.alipan.com/users/v1/users/device/renew_session", http.MethodPost, nil, nil)
+// 	_, err, _ := d.requestS("https://api.alipan.com/users/v1/users/device/renew_session", http.MethodPost, nil, nil)
 // 	return err
 // }
 
@@ -141,7 +141,7 @@ func (d *AliDrive) request(url, method string, callback base.ReqCallback, resp i
 	return res.Body(), nil, e
 }
 
-func (d *AliDrive) requestS(url, method string, data interface{}, headers map[string]string) ([]byte, error, RespErr) {
+func (d *AliDrive) requestS(url, method string, data interface{}, headers map[string]string, resp interface{}) ([]byte, error, RespErr) {
 	timestamp := fmt.Sprint(time.Now().UnixMilli())
 	nonce := uuid.NewString()
 	var e RespErr
@@ -174,7 +174,7 @@ func (d *AliDrive) requestS(url, method string, data interface{}, headers map[st
 	res, err, e := d.request(url, method, func(req *resty.Request) {
 		req.SetHeaders(reqHeaders)
 		req.SetBody(data)
-	}, nil)
+	}, resp)
 
 	return res, err, e
 }
@@ -200,9 +200,9 @@ func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 			"video_thumbnail_process": "video/snapshot,t_0,f_jpg,ar_auto,w_300",
 			"url_expire_sec":          14400,
 		}
-		_, err, _ := d.request("https://api.alipan.com/v2/file/list", http.MethodPost, func(req *resty.Request) {
+		_, err, _ := d.requestS("https://api.alipan.com/v2/file/list", http.MethodPost, func(req *resty.Request) {
 			req.SetBody(data)
-		}, &resp)
+		}, nil, &resp)
 
 		if err != nil {
 			return nil, err
@@ -214,7 +214,7 @@ func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 }
 
 func (d *AliDrive) batch(srcId, dstId string, url string) error {
-	res, err, _ := d.request("https://api.alipan.com/v3/batch", http.MethodPost, func(req *resty.Request) {
+	res, err, _ := d.requestS("https://api.alipan.com/v3/batch", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"requests": []base.Json{
 				{
@@ -234,7 +234,7 @@ func (d *AliDrive) batch(srcId, dstId string, url string) error {
 			},
 			"resource": "file",
 		})
-	}, nil)
+	}, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -296,7 +296,7 @@ func (d *AliDrive) refreshDriveId(ctx context.Context) error {
 	infoHeader := map[string]string{
 		"host": "user.alipan.com",
 	}
-	res, err, _ := d.requestS("https://bizapi.alipan.com/v2/user/get", http.MethodPost, nil, infoHeader)
+	res, err, _ := d.requestS("https://bizapi.alipan.com/v2/user/get", http.MethodPost, nil, infoHeader, nil)
 	if err != nil {
 		return err
 	}

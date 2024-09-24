@@ -52,7 +52,7 @@ func (d *AliDrive) Init(ctx context.Context) error {
 		return err
 	}
 	// get driver id
-	res, err, _ := d.request("https://api.alipan.com/v2/user/get", http.MethodPost, nil, nil)
+	res, err, _ := d.requestS("https://api.alipan.com/v2/user/get", http.MethodPost, nil, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -107,7 +107,7 @@ func (d *AliDrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		"file_id":    file.GetID(),
 		"expire_sec": 14400,
 	}
-	res, err, _ := d.requestS("https://api.alipan.com/v2/file/get_download_url", http.MethodPost, data, nil)
+	res, err, _ := d.requestS("https://api.alipan.com/v2/file/get_download_url", http.MethodPost, data, nil, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -119,14 +119,16 @@ func (d *AliDrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 		decryptURL, _ := d.decryptURL(encryptURL)
 		return &model.Link{
 			Header: http.Header{
-				"Referer": []string{"https://www.alipan.com/"},
+				"Referer":    []string{"https://www.alipan.com/"},
+				"User-Agent": []string{d.Addition.UserAgent},
 			},
 			URL: decryptURL,
 		}, nil
 	} else {
 		return &model.Link{
 			Header: http.Header{
-				"Referer": []string{"https://www.alipan.com/"},
+				"Referer":    []string{"https://www.alipan.com/"},
+				"User-Agent": []string{d.Addition.UserAgent},
 			},
 			URL: utils.Json.Get(res, "url").ToString(),
 		}, nil
@@ -135,7 +137,7 @@ func (d *AliDrive) Link(ctx context.Context, file model.Obj, args model.LinkArgs
 }
 
 func (d *AliDrive) MakeDir(ctx context.Context, parentDir model.Obj, dirName string) error {
-	_, err, _ := d.request("https://api.alipan.com/adrive/v2/file/createWithFolders", http.MethodPost, func(req *resty.Request) {
+	_, err, _ := d.requestS("https://api.alipan.com/adrive/v2/file/createWithFolders", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"check_name_mode": "refuse",
 			"drive_id":        d.DriveId,
@@ -143,7 +145,7 @@ func (d *AliDrive) MakeDir(ctx context.Context, parentDir model.Obj, dirName str
 			"parent_file_id":  parentDir.GetID(),
 			"type":            "folder",
 		})
-	}, nil)
+	}, nil, nil)
 	return err
 }
 
@@ -153,14 +155,14 @@ func (d *AliDrive) Move(ctx context.Context, srcObj, dstDir model.Obj) error {
 }
 
 func (d *AliDrive) Rename(ctx context.Context, srcObj model.Obj, newName string) error {
-	_, err, _ := d.request("https://api.alipan.com/v3/file/update", http.MethodPost, func(req *resty.Request) {
+	_, err, _ := d.requestS("https://api.alipan.com/v3/file/update", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"check_name_mode": "refuse",
 			"drive_id":        d.DriveId,
 			"file_id":         srcObj.GetID(),
 			"name":            newName,
 		})
-	}, nil)
+	}, nil, nil)
 	return err
 }
 
@@ -170,12 +172,12 @@ func (d *AliDrive) Copy(ctx context.Context, srcObj, dstDir model.Obj) error {
 }
 
 func (d *AliDrive) Remove(ctx context.Context, obj model.Obj) error {
-	_, err, _ := d.request("https://api.alipan.com/v2/recyclebin/trash", http.MethodPost, func(req *resty.Request) {
+	_, err, _ := d.requestS("https://api.alipan.com/v2/recyclebin/trash", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"drive_id": d.DriveId,
 			"file_id":  obj.GetID(),
 		})
-	}, nil)
+	}, nil, nil)
 	return err
 }
 
@@ -230,9 +232,9 @@ func (d *AliDrive) Put(ctx context.Context, dstDir model.Obj, streamer model.Fil
 	}
 
 	var resp UploadResp
-	_, err, e := d.request("https://api.alipan.com/adrive/v2/file/createWithFolders", http.MethodPost, func(req *resty.Request) {
+	_, err, e := d.requestS("https://api.alipan.com/adrive/v2/file/createWithFolders", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(reqBody)
-	}, &resp)
+	}, nil, &resp)
 
 	if err != nil && e.Code != "PreHashMatched" {
 		return err
@@ -284,9 +286,9 @@ func (d *AliDrive) Put(ctx context.Context, dstDir model.Obj, streamer model.Fil
 		n, _ := io.NewSectionReader(localFile, o.Int64(), 8).Read(buf[:8])
 		reqBody["proof_code"] = base64.StdEncoding.EncodeToString(buf[:n])
 
-		_, err, e := d.request("https://api.alipan.com/adrive/v2/file/createWithFolders", http.MethodPost, func(req *resty.Request) {
+		_, err, e := d.requestS("https://api.alipan.com/adrive/v2/file/createWithFolders", http.MethodPost, func(req *resty.Request) {
 			req.SetBody(reqBody)
-		}, &resp)
+		}, nil, &resp)
 		if err != nil && e.Code != "PreHashMatched" {
 			return err
 		}
@@ -323,13 +325,13 @@ func (d *AliDrive) Put(ctx context.Context, dstDir model.Obj, streamer model.Fil
 		}
 	}
 	var resp2 base.Json
-	_, err, e = d.request("https://api.alipan.com/v2/file/complete", http.MethodPost, func(req *resty.Request) {
+	_, err, e = d.requestS("https://api.alipan.com/v2/file/complete", http.MethodPost, func(req *resty.Request) {
 		req.SetBody(base.Json{
 			"drive_id":  d.DriveId,
 			"file_id":   resp.FileId,
 			"upload_id": resp.UploadId,
 		})
-	}, &resp2)
+	}, nil, &resp2)
 	if err != nil && e.Code != "PreHashMatched" {
 		return err
 	}
@@ -357,9 +359,9 @@ func (d *AliDrive) Other(ctx context.Context, args model.OtherArgs) (interface{}
 	default:
 		return nil, errs.NotSupport
 	}
-	_, err, _ := d.request(url, http.MethodPost, func(req *resty.Request) {
+	_, err, _ := d.requestS(url, http.MethodPost, func(req *resty.Request) {
 		req.SetBody(data)
-	}, &resp)
+	}, nil, &resp)
 	if err != nil {
 		return nil, err
 	}
