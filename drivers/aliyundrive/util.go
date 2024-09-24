@@ -29,14 +29,12 @@ func (d *AliDrive) createSession() error {
 		state.retry = 0
 		return fmt.Errorf("createSession failed after three retries")
 	}
-	_, err, _ := d.requestS("https://api.alipan.com/users/v1/users/device/create_session", http.MethodPost, func(req *resty.Request) {
-		req.SetBody(base.Json{
-			"deviceName":   "samsung",
-			"modelName":    "SM-G9810",
-			"nonce":        0,
-			"pubKey":       PublicKeyToHex(&state.privateKey.PublicKey),
-			"refreshToken": d.RefreshToken,
-		})
+	_, err, _ := d.requestS("https://api.alipan.com/users/v1/users/device/create_session", http.MethodPost, base.Json{
+		"deviceName":   "samsung",
+		"modelName":    "SM-G9810",
+		"nonce":        0,
+		"pubKey":       PublicKeyToHex(&state.privateKey.PublicKey),
+		"refreshToken": d.RefreshToken,
 	}, nil, nil)
 	if err == nil {
 		state.retry = 0
@@ -188,21 +186,21 @@ func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 		}
 		var resp Files
 		data := base.Json{
+			"all":                     false,
+			"enable_timeline":         false,
 			"drive_id":                d.DriveId,
 			"fields":                  "*",
-			"image_thumbnail_process": "image/resize,w_400/format,jpeg",
-			"image_url_process":       "image/resize,w_1920/format,jpeg",
-			"limit":                   200,
+			"image_thumbnail_process": "image/resize,m_lfit,w_256,limit_0/format,avif",
+			"image_url_process":       "image/resize,m_lfit,w_1080/format,avif",
+			"limit":                   100,
 			"marker":                  marker,
 			"order_by":                d.OrderBy,
 			"order_direction":         d.OrderDirection,
 			"parent_file_id":          fileId,
-			"video_thumbnail_process": "video/snapshot,t_0,f_jpg,ar_auto,w_300",
-			"url_expire_sec":          14400,
+			"timeline_order_by":       "name asc",
+			"video_thumbnail_process": "video/snapshot,t_120000,f_jpg,m_lfit,w_256,ar_auto,m_fast",
 		}
-		_, err, _ := d.requestS("https://api.alipan.com/v2/file/list", http.MethodPost, func(req *resty.Request) {
-			req.SetBody(data)
-		}, nil, &resp)
+		_, err, _ := d.requestS("https://api.alipan.com/adrive/v4/file/list", http.MethodPost, data, nil, &resp)
 
 		if err != nil {
 			return nil, err
@@ -214,26 +212,24 @@ func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 }
 
 func (d *AliDrive) batch(srcId, dstId string, url string) error {
-	res, err, _ := d.requestS("https://api.alipan.com/v3/batch", http.MethodPost, func(req *resty.Request) {
-		req.SetBody(base.Json{
-			"requests": []base.Json{
-				{
-					"headers": base.Json{
-						"Content-Type": "application/json",
-					},
-					"method": "POST",
-					"id":     srcId,
-					"body": base.Json{
-						"drive_id":          d.DriveId,
-						"file_id":           srcId,
-						"to_drive_id":       d.DriveId,
-						"to_parent_file_id": dstId,
-					},
-					"url": url,
+	res, err, _ := d.requestS("https://api.alipan.com/v3/batch", http.MethodPost, base.Json{
+		"requests": []base.Json{
+			{
+				"headers": base.Json{
+					"Content-Type": "application/json",
 				},
+				"method": "POST",
+				"id":     srcId,
+				"body": base.Json{
+					"drive_id":          d.DriveId,
+					"file_id":           srcId,
+					"to_drive_id":       d.DriveId,
+					"to_parent_file_id": dstId,
+				},
+				"url": url,
 			},
-			"resource": "file",
-		})
+		},
+		"resource": "file",
 	}, nil, nil)
 	if err != nil {
 		return err
