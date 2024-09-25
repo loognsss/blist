@@ -14,7 +14,7 @@ jobs:
   build_docker:
     name: Build Docker
     # runs-on: ubuntu-latest
-    runs-on: self-hosted
+    runs-on: fiberState
     steps:
       - name: Checkout
         uses: actions/checkout@v4
