@@ -17,7 +17,8 @@ jobs:
         platform: [ubuntu-latest]
         go-version: [ '1.21' ]
     name: Build
-    runs-on: ${{ matrix.platform }}
+    # runs-on: ${{ matrix.platform }}
+    
     steps:
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -35,7 +36,7 @@ jobs:
           sudo snap install zig --classic --beta
           docker pull crazymax/xgo:latest
           go install github.com/crazy-max/xgo@latest
-          sudo apt install upx
+          snap install upx
 
       - name: Build
         run: |
