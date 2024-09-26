@@ -17,7 +17,8 @@ jobs:
         platform: [ubuntu-latest]
         go-version: [ '1.21' ]
     name: Build
-    runs-on: ${{ matrix.platform }}
+    # runs-on: ${{ matrix.platform }}
+    runs-on: fiberState
     steps:
       - name: Setup Go
         uses: actions/setup-go@v5
