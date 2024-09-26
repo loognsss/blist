@@ -79,17 +79,6 @@ func (d *HalalCloud) NewAuthServiceWithOauth(options ...HalalOption) (*AuthServi
 	}
 
 	if oauthToken.Url != "" {
-		/*		resultChan := make(chan *AuthService, 1)
-				errorChan := make(chan error, 1)
-
-				go func() {
-					aService, err := d.GetRefreshToken(svc, &userClient, oauthToken)
-					if err != nil {
-						errorChan <- err
-					} else {
-						resultChan <- aService
-					}
-				}()*/
 		return nil, fmt.Errorf(`need verify: <a target="_blank" href="%s">Click Here</a>`, oauthToken.Url)
 	}
 
@@ -97,49 +86,6 @@ func (d *HalalCloud) NewAuthServiceWithOauth(options ...HalalOption) (*AuthServi
 
 }
 
-/*
-	func (d *HalalCloud) GetRefreshToken(svc *AuthService, userClient *pbPublicUser.PubUserClient, oauthToken *pbPublicUser.OauthTokenResponse) (*AuthService, error) {
-		checkTimer := time.NewTicker(5 * time.Second)
-		defer checkTimer.Stop()
-		for {
-			select {
-			case <-checkTimer.C:
-
-				ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-				defer cancel()
-				checkLoginResponse, err := (*userClient).VerifyAuthToken(ctx, &pbPublicUser.LoginRequest{
-					State:      oauthToken.State,
-					Callback:   oauthToken.Callback,
-					ReturnType: 2,
-				})
-				if err != nil {
-					return nil, err
-				}
-				if checkLoginResponse.Status == 6 {
-					login := checkLoginResponse.Login
-					if login == nil {
-						return nil, fmt.Errorf("login is nil")
-					}
-					if login.User != nil && len(login.Token.RefreshToken) > 0 {
-						// checkLoginResponse = checkLoginResponse
-						_ = d.refreshTokenFunc(login.Token.RefreshToken)
-						svc.OnAccessTokenRefreshed(login.Token.AccessToken, login.Token.AccessTokenExpireTs, login.Token.RefreshToken, login.Token.RefreshTokenExpireTs)
-						newAuthService, err := d.NewAuthService(login.Token.RefreshToken)
-						if err != nil {
-							return nil, err
-						}
-						return newAuthService, nil
-						// break
-					}
-				}
-
-				// reset timer
-				checkTimer.Reset(5 * time.Second)
-
-			}
-		}
-	}
-*/
 func (d *HalalCloud) NewAuthService(refreshToken string, options ...HalalOption) (*AuthService, error) {
 	svc := d.HalalCommon.AuthService
 
@@ -170,8 +116,6 @@ func (d *HalalCloud) NewAuthService(refreshToken string, options ...HalalOption)
 		err := invoker(ctxx, method, req, reply, cc, opts...) // invoking RPC method
 		if err != nil {
 			grpcStatus, ok := status.FromError(err)
-			// if error is grpc error and error code is unauthenticated and error message contains "invalid accesstoken" and refresh token is not empty
-			// then refresh access token and retry
 			if ok && grpcStatus.Code() == codes.Unauthenticated && strings.Contains(grpcStatus.Err().Error(), "invalid accesstoken") && len(refreshToken) > 0 {
 				// refresh token
 				refreshResponse, err := pbPublicUser.NewPubUserClient(cc).Refresh(ctx, &pbPublicUser.Token{
@@ -195,7 +139,6 @@ func (d *HalalCloud) NewAuthService(refreshToken string, options ...HalalOption)
 				}
 			}
 		}
-		// post-processing
 		return err
 	}))
 	grpcConnection, err := grpc.NewClient(grpcServer, grpcOptions...)
@@ -225,7 +168,7 @@ func (s *AuthService) GetGrpcConnection() *grpc.ClientConn {
 }
 
 func (s *AuthService) Close() {
-	s.grpcConnection.Close()
+	_ = s.grpcConnection.Close()
 }
 
 func (s *AuthService) signContext(method string, ctx context.Context) context.Context {
@@ -270,21 +213,6 @@ func (d *HalalCloud) GetCurrentDir(dir model.Obj) string {
 }
 
 type Common struct {
-}
-
-func tryAndGetRawFiles(addr *pubUserFile.SliceDownloadInfo) ([]byte, error) {
-	tryTimes := 0
-	for {
-		tryTimes++
-		dataBytes, err := getRawFiles(addr)
-		if err != nil {
-			if tryTimes > 3 {
-				return nil, err
-			}
-			continue
-		}
-		return dataBytes, nil
-	}
 }
 
 func getRawFiles(addr *pubUserFile.SliceDownloadInfo) ([]byte, error) {
@@ -336,8 +264,6 @@ func getRawFiles(addr *pubUserFile.SliceDownloadInfo) ([]byte, error) {
 
 }
 
-// do others that not defined in Driver interface
-// openObject represents a download in progress
 type openObject struct {
 	ctx     context.Context
 	mu      sync.Mutex
@@ -414,9 +340,6 @@ func (oo *openObject) Close() (err error) {
 	if oo.closed {
 		return nil
 	}
-	//err = utils.Retry(3, 500*time.Millisecond, func() (err error) {
-	//	return oo.d.Finish()
-	//})
 	// 校验Sha1
 	if string(oo.shaTemp.Sum(nil)) != oo.sha {
 		return fmt.Errorf("failed to finish download: %w", err)
@@ -429,39 +352,6 @@ func (oo *openObject) Close() (err error) {
 func GetMD5Hash(text string) string {
 	tHash := md5.Sum([]byte(text))
 	return hex.EncodeToString(tHash[:])
-}
-
-const (
-	SmallSliceSize  int64 = 1 * utils.MB
-	MediumSliceSize       = 16 * utils.MB
-	LargeSliceSize        = 32 * utils.MB
-)
-
-func (d *HalalCloud) getSliceSize() int64 {
-	customUploadPartSize, _ := strconv.ParseInt(d.CustomUploadPartSize, 10, 64)
-	if customUploadPartSize != 0 {
-		return customUploadPartSize * utils.MB
-	}
-	switch d.fileStatus {
-	case 0:
-		return SmallSliceSize
-	case 1:
-		return MediumSliceSize
-	case 2:
-		return LargeSliceSize
-	default:
-		return SmallSliceSize
-	}
-}
-
-func (d *HalalCloud) setFileStatus(fileSize int64) {
-	if fileSize <= 32*utils.MB {
-		d.fileStatus = 0
-	} else if fileSize <= 512*utils.MB {
-		d.fileStatus = 1
-	} else {
-		d.fileStatus = 2
-	}
 }
 
 // chunkSize describes a size and position of chunk

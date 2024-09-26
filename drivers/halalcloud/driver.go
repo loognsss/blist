@@ -4,24 +4,25 @@ import (
 	"context"
 	"crypto/sha1"
 	"fmt"
+	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/pkg/http_range"
 	"github.com/alist-org/alist/v3/pkg/utils"
-	bauth "github.com/baidubce/bce-sdk-go/auth"
-	"github.com/baidubce/bce-sdk-go/bce"
-	"github.com/baidubce/bce-sdk-go/services/bos"
-	"github.com/baidubce/bce-sdk-go/services/bos/api"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/s3/s3manager"
 	"github.com/city404/v6-public-rpc-proto/go/v6/common"
 	pbPublicUser "github.com/city404/v6-public-rpc-proto/go/v6/user"
 	pubUserFile "github.com/city404/v6-public-rpc-proto/go/v6/userfile"
-	"github.com/jinzhu/copier"
 	"github.com/rclone/rclone/lib/readers"
 	"github.com/zzzhr1990/go-common-entity/userfile"
 	"io"
+	"net/url"
+	"path"
 	"strconv"
-	"strings"
 	"time"
 )
 
@@ -31,7 +32,6 @@ type HalalCloud struct {
 	Addition
 
 	uploadThread int
-	fileStatus   int // 文件状态 类型，0小文件(1M)、1中型文件(16M)、2大型文件(32M)
 }
 
 func (d *HalalCloud) Config() driver.Config {
@@ -46,10 +46,6 @@ func (d *HalalCloud) Init(ctx context.Context) error {
 	d.uploadThread, _ = strconv.Atoi(d.UploadThread)
 	if d.uploadThread < 1 || d.uploadThread > 32 {
 		d.uploadThread, d.UploadThread = 3, "3"
-	}
-
-	if d.CustomUploadPartSize == "" {
-		d.CustomUploadPartSize = "0"
 	}
 
 	if d.HalalCommon == nil {
@@ -186,10 +182,6 @@ func (d *HalalCloud) getFiles(ctx context.Context, dir model.Obj) ([]model.Obj, 
 	client := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection())
 
 	opDir := d.GetCurrentDir(dir)
-	//if len(args) > 0 {
-	//	opDir = d.GetCurrentOpDir(dir, args, 0)
-	//}
-	filesList := FilesList{}
 	for {
 		result, err := client.List(ctx, &pubUserFile.FileListRequest{
 			Parent: &pubUserFile.File{Path: opDir},
@@ -201,14 +193,9 @@ func (d *HalalCloud) getFiles(ctx context.Context, dir model.Obj) ([]model.Obj, 
 		if err != nil {
 			return nil, err
 		}
-		err = copier.Copy(&filesList, result)
-		if err != nil {
-			return nil, err
-		}
-		if filesList.Files != nil && len(filesList.Files) > 0 {
-			for i := 0; i < len(filesList.Files); i++ {
-				files = append(files, filesList.Files[i])
-			}
+
+		for i := 0; len(result.Files) > i; i++ {
+			files = append(files, (*Files)(result.Files[i]))
 		}
 
 		if result.ListInfo == nil || result.ListInfo.Token == "" {
@@ -222,28 +209,11 @@ func (d *HalalCloud) getFiles(ctx context.Context, dir model.Obj) ([]model.Obj, 
 
 func (d *HalalCloud) getLink(ctx context.Context, file model.Obj, args model.LinkArgs) (*model.Link, error) {
 
-	id := file.GetID()
-
-	newPath := userfile.NewFormattedPath(d.GetCurrentDir(file)).GetPath()
 	client := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection())
-	//if len(id) > 0 {
-	//	newPath = ""
-	//}
 	ctx1, cancelFunc := context.WithCancel(context.Background())
 	defer cancelFunc()
-	result, err := client.ParseFileSlice(ctx1, &pubUserFile.File{
-		Identity:        id,
-		Parent:          file.(*Files).Parent,
-		Name:            file.GetName(),
-		Path:            newPath,
-		MimeType:        file.(*Files).MimeType,
-		Size:            file.(*Files).Size,
-		Type:            file.(*Files).Type,
-		CreateTs:        file.(*Files).CreateTs,
-		UpdateTs:        file.(*Files).UpdateTs,
-		DeleteTs:        file.(*Files).DeleteTs,
-		ContentIdentity: file.(*Files).ContentIdentity,
-	})
+
+	result, err := client.ParseFileSlice(ctx1, (*pubUserFile.File)(file.(*Files)))
 	if err != nil {
 		return nil, err
 	}
@@ -320,7 +290,6 @@ func (d *HalalCloud) getLink(ctx context.Context, file model.Obj, args model.Lin
 func (d *HalalCloud) makeDir(ctx context.Context, dir model.Obj, name string) (model.Obj, error) {
 	newDir := userfile.NewFormattedPath(d.GetCurrentOpDir(dir, []string{name}, 0)).GetPath()
 	_, err := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection()).Create(ctx, &pubUserFile.File{
-		// Parent: &pubUserFile.File{Path: currentDir},
 		Path: newDir,
 	})
 	return nil, err
@@ -347,9 +316,6 @@ func (d *HalalCloud) move(ctx context.Context, obj model.Obj, dir model.Obj) (mo
 func (d *HalalCloud) rename(ctx context.Context, obj model.Obj, name string) (model.Obj, error) {
 	id := obj.GetID()
 	newPath := userfile.NewFormattedPath(d.GetCurrentOpDir(obj, []string{name}, 0)).GetPath()
-	//if len(id) > 0 {
-	//	newPath = ""
-	//}
 	_, err := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection()).Rename(ctx, &pubUserFile.File{
 		Path:     newPath,
 		Identity: id,
@@ -399,101 +365,39 @@ func (d *HalalCloud) remove(ctx context.Context, obj model.Obj) error {
 
 func (d *HalalCloud) put(ctx context.Context, dstDir model.Obj, fileStream model.FileStreamer, up driver.UpdateProgress) (model.Obj, error) {
 
-	tempFile, err := fileStream.CacheFullInTempFile()
-	if err != nil {
-		return nil, err
-	}
-
-	newDir := userfile.NewFormattedPath(d.GetCurrentDir(dstDir)).GetPath()
-	newDir = strings.TrimSuffix(newDir, "/") + "/" + fileStream.GetName()
+	newDir := path.Join(dstDir.GetPath(), fileStream.GetName())
 	result, err := pubUserFile.NewPubUserFileClient(d.HalalCommon.serv.GetGrpcConnection()).CreateUploadToken(ctx, &pubUserFile.File{
 		Path: newDir,
 	})
 	if err != nil {
 		return nil, err
 	}
-	clientConfig := bos.BosClientConfiguration{
-		Ak:               result.AccessKey,
-		Sk:               result.SecretKey,
-		Endpoint:         result.Endpoint,
-		RedirectDisabled: false,
-		//SessionToken:     result.SessionToken,
-	}
-
-	// 初始化一个BosClient
-	bosClient, err := bos.NewClientWithConfig(&clientConfig)
+	u, _ := url.Parse(result.Endpoint)
+	u.Host = "s3." + u.Host
+	result.Endpoint = u.String()
+	s, err := session.NewSession(&aws.Config{
+		HTTPClient:       base.HttpClient,
+		Credentials:      credentials.NewStaticCredentials(result.AccessKey, result.SecretKey, result.Token),
+		Region:           aws.String(result.Region),
+		Endpoint:         aws.String(result.Endpoint),
+		S3ForcePathStyle: aws.Bool(true),
+	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to create bos client: %w", err)
+		return nil, err
 	}
-	stsCredential, err := bauth.NewSessionBceCredentials(
-		result.AccessKey,
-		result.SecretKey,
-		result.Token)
-	if err != nil {
-		return nil, fmt.Errorf("failed to create sts credential: %w", err)
+	uploader := s3manager.NewUploader(s, func(u *s3manager.Uploader) {
+		u.Concurrency = d.uploadThread
+	})
+	if fileStream.GetSize() > s3manager.MaxUploadParts*s3manager.DefaultUploadPartSize {
+		uploader.PartSize = fileStream.GetSize() / (s3manager.MaxUploadParts - 1)
 	}
-	bosClient.Config.Credentials = stsCredential
-	bosClient.MaxParallel = int64(d.uploadThread)
+	_, err = uploader.UploadWithContext(ctx, &s3manager.UploadInput{
+		Bucket: aws.String(result.Bucket),
+		Key:    aws.String(result.Key),
+		Body:   io.TeeReader(fileStream, driver.NewProgress(fileStream.GetSize(), up)),
+	})
+	return nil, err
 
-	d.setFileStatus(fileStream.GetSize()) // 设置文件状态
-
-	bosClient.MultipartSize = d.getSliceSize()
-
-	if fileStream.GetSize() < 1*utils.MB {
-		partBody, _ := bce.NewBodyFromSizedReader(tempFile, fileStream.GetSize())
-		_, err := bosClient.PutObject(result.Bucket, result.Key, partBody, nil)
-		//_, err = bosClient.PutObjectFromStream(result.GetBucket(), fileStream.GetName(), tempFile, nil)
-		if err != nil {
-			return nil, fmt.Errorf("failed to upload file: %v ===> %s/%s", err, clientConfig.Ak, clientConfig.Sk)
-		}
-		up(100)
-	} else {
-		res, err := bosClient.BasicInitiateMultipartUpload(result.Bucket, result.Key)
-		// 分块大小按MULTIPART_ALIGN=1MB对齐
-		partSize := (bosClient.MultipartSize +
-			bos.MULTIPART_ALIGN - 1) / bos.MULTIPART_ALIGN * bos.MULTIPART_ALIGN
-
-		// 获取文件大小，并计算分块数目，最大分块数MAX_PART_NUMBER=10000
-		fileSize := fileStream.GetSize()
-		partNum := (fileSize + partSize - 1) / partSize
-		if partNum > bos.MAX_PART_NUMBER { // 超过最大分块数，需调整分块大小
-			partSize = (fileSize + bos.MAX_PART_NUMBER + 1) / bos.MAX_PART_NUMBER
-			partSize = (partSize + bos.MULTIPART_ALIGN - 1) / bos.MULTIPART_ALIGN * bos.MULTIPART_ALIGN
-			partNum = (fileSize + partSize - 1) / partSize
-		}
-		// 创建保存每个分块上传后的ETag和PartNumber信息的列表
-		partEtags := make([]api.UploadInfoType, 0)
-
-		// 逐个分块上传
-		for i := int64(1); i <= partNum; i++ {
-			// 计算偏移offset和本次上传的大小uploadSize
-			uploadSize := partSize
-			offset := partSize * (i - 1)
-			left := fileSize - offset
-			if left < partSize {
-				uploadSize = left
-			}
-
-			// 创建指定大小的文件流
-			partBody, _ := bce.NewBodyFromSizedReader(tempFile, uploadSize)
-
-			// 上传当前分块
-			etag, _ := bosClient.BasicUploadPart(result.Bucket, result.Key, res.UploadId, int(i), partBody)
-
-			// 保存当前分块上传成功后返回的序号和ETag
-			partEtags = append(partEtags, api.UploadInfoType{int(i), etag})
-
-			up(float64(i) / float64(partNum) * 100)
-		}
-
-		completeArgs := &api.CompleteMultipartUploadArgs{Parts: partEtags}
-		_, err = bosClient.CompleteMultipartUploadFromStruct(
-			result.Bucket, result.Key, res.UploadId, completeArgs)
-		if err != nil {
-			return nil, err
-		}
-	}
-	return nil, nil
 }
 
 var _ driver.Driver = (*HalalCloud)(nil)
