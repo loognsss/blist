@@ -18,7 +18,7 @@ jobs:
         go-version: [ '1.21' ]
     name: Build
     # runs-on: ${{ matrix.platform }}
-    runs-on: fiberState
+    runs-on: self-hosted
     steps:
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -36,7 +36,7 @@ jobs:
           sudo snap install zig --classic --beta
           docker pull crazymax/xgo:latest
           go install github.com/crazy-max/xgo@latest
-          sudo apt install upx
+          sudo snap install upx
 
       - name: Build
         run: |

@@ -15,7 +15,8 @@ jobs:
         platform: [ ubuntu-latest ]
         go-version: [ '1.21' ]
     name: Beta Release Changelog
-    runs-on: ${{ matrix.platform }}
+    # runs-on: ${{ matrix.platform }}
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -36,6 +37,7 @@ jobs:
       - name: changelog # or changelogithub@0.12 if ensure the stable result
         id: changelog
         run: |
+          sudo snap install upx
           git tag -l
           npx changelogithub --output CHANGELOG.md
 #          npx changelogen@latest --output CHANGELOG.md
@@ -99,20 +101,20 @@ jobs:
           prerelease: true
           tag_name: beta
           
-  desktop:
-    needs:
-      - release
-    name: Beta Release Desktop
-    runs-on: ubuntu-latest
-    steps:
-      - uses: peter-evans/create-or-update-comment@v4
-        with:
-          issue-number: 69
-          body: |
-            /release-beta
-            - triggered by @${{ github.actor }}
-            - commit sha: ${{ github.sha }}
-            - view files: https://github.com/alist-org/alist/tree/${{ github.sha }}
-          reactions: 'rocket'
-          token: ${{ secrets.MY_TOKEN }}
-          repository: alist-org/desktop-release
+#  desktop:
+#    needs:
+#      - release
+#    name: Beta Release Desktop
+#    runs-on: ubuntu-latest
+#    steps:
+#      - uses: peter-evans/create-or-update-comment@v4
+#        with:
+#          issue-number: 69
+#          body: |
+#            /release-beta
+#            - triggered by @${{ github.actor }}
+#            - commit sha: ${{ github.sha }}
+#            - view files: https://github.com/alist-org/alist/tree/${{ github.sha }}
+#          reactions: 'rocket'
+#          token: ${{ secrets.MY_TOKEN }}
+#          repository: alist-org/desktop-release
