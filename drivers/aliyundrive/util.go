@@ -1,11 +1,14 @@
 package aliyundrive
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
+	"time"
 
 	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/op"
@@ -26,23 +29,21 @@ func (d *AliDrive) createSession() error {
 		state.retry = 0
 		return fmt.Errorf("createSession failed after three retries")
 	}
-	_, err, _ := d.request("https://api.alipan.com/users/v1/users/device/create_session", http.MethodPost, func(req *resty.Request) {
-		req.SetBody(base.Json{
-			"deviceName":   "samsung",
-			"modelName":    "SM-G9810",
-			"nonce":        0,
-			"pubKey":       PublicKeyToHex(&state.privateKey.PublicKey),
-			"refreshToken": d.RefreshToken,
-		})
-	}, nil)
-	if err == nil{
+	_, err, _ := d.requestS("https://api.alipan.com/users/v1/users/device/create_session", http.MethodPost, base.Json{
+		"deviceName":   "samsung",
+		"modelName":    "SM-G9810",
+		"nonce":        0,
+		"pubKey":       PublicKeyToHex(&state.privateKey.PublicKey),
+		"refreshToken": d.RefreshToken,
+	}, nil, nil)
+	if err == nil {
 		state.retry = 0
 	}
 	return err
 }
 
 // func (d *AliDrive) renewSession() error {
-// 	_, err, _ := d.request("https://api.alipan.com/users/v1/users/device/renew_session", http.MethodPost, nil, nil)
+// 	_, err, _ := d.requestS("https://api.alipan.com/users/v1/users/device/renew_session", http.MethodPost, nil, nil)
 // 	return err
 // }
 
@@ -92,13 +93,14 @@ func (d *AliDrive) request(url, method string, callback base.ReqCallback, resp i
 		}
 	}
 	req.SetHeaders(map[string]string{
-		"Authorization": "Bearer\t" + d.AccessToken,
-		"content-type":  "application/json",
+		//"Authorization": "Bearer\t" + d.AccessToken,
+		"Authorization": d.AccessToken,
+		"content-type":  "application/json; charset=UTF-8",
 		"origin":        "https://www.alipan.com",
 		"Referer":       "https://alipan.com/",
 		"X-Signature":   state.signature,
 		"x-request-id":  uuid.NewString(),
-		"X-Canary":      "client=Android,app=adrive,version=v4.1.0",
+		"X-Canary":      d.XCanary,
 		"X-Device-Id":   state.deviceID,
 	})
 	if callback != nil {
@@ -137,6 +139,44 @@ func (d *AliDrive) request(url, method string, callback base.ReqCallback, resp i
 	return res.Body(), nil, e
 }
 
+func (d *AliDrive) requestS(url, method string, data interface{}, headers map[string]string, resp interface{}) ([]byte, error, RespErr) {
+	timestamp := fmt.Sprint(time.Now().UnixMilli())
+	nonce := uuid.NewString()
+	var e RespErr
+	signV2, err := d.getSign(timestamp, nonce)
+	if err != nil {
+		return nil, err, e
+	}
+
+	reqHeaders := map[string]string{
+		"x-signature-v2": signV2,
+		"x-nonce":        nonce,
+		"x-timestamp":    timestamp,
+		"User-Agent":     d.UserAgent,
+	}
+
+	// Merge additional headers if provided
+	for k, v := range headers {
+		reqHeaders[k] = v
+	}
+	// 获取 x-mini-wua x-sgext x-sign x-umt x-bx-version
+	bJson, err := d.generateSecurityHeader(url)
+	if err != nil {
+		return nil, err, e
+	}
+
+	for k, v := range bJson {
+		reqHeaders[k] = v.(string)
+	}
+
+	res, err, e := d.request(url, method, func(req *resty.Request) {
+		req.SetHeaders(reqHeaders)
+		req.SetBody(data)
+	}, resp)
+
+	return res, err, e
+}
+
 func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 	marker := "first"
 	res := make([]File, 0)
@@ -146,21 +186,21 @@ func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 		}
 		var resp Files
 		data := base.Json{
+			"all":                     false,
+			"enable_timeline":         false,
 			"drive_id":                d.DriveId,
 			"fields":                  "*",
-			"image_thumbnail_process": "image/resize,w_400/format,jpeg",
-			"image_url_process":       "image/resize,w_1920/format,jpeg",
-			"limit":                   200,
+			"image_thumbnail_process": "image/resize,m_lfit,w_256,limit_0/format,avif",
+			"image_url_process":       "image/resize,m_lfit,w_1080/format,avif",
+			"limit":                   100,
 			"marker":                  marker,
 			"order_by":                d.OrderBy,
 			"order_direction":         d.OrderDirection,
 			"parent_file_id":          fileId,
-			"video_thumbnail_process": "video/snapshot,t_0,f_jpg,ar_auto,w_300",
-			"url_expire_sec":          14400,
+			"timeline_order_by":       "name asc",
+			"video_thumbnail_process": "video/snapshot,t_120000,f_jpg,m_lfit,w_256,ar_auto,m_fast",
 		}
-		_, err, _ := d.request("https://api.alipan.com/v2/file/list", http.MethodPost, func(req *resty.Request) {
-			req.SetBody(data)
-		}, &resp)
+		_, err, _ := d.requestS("https://api.alipan.com/adrive/v4/file/list", http.MethodPost, data, nil, &resp)
 
 		if err != nil {
 			return nil, err
@@ -172,27 +212,25 @@ func (d *AliDrive) getFiles(fileId string) ([]File, error) {
 }
 
 func (d *AliDrive) batch(srcId, dstId string, url string) error {
-	res, err, _ := d.request("https://api.alipan.com/v3/batch", http.MethodPost, func(req *resty.Request) {
-		req.SetBody(base.Json{
-			"requests": []base.Json{
-				{
-					"headers": base.Json{
-						"Content-Type": "application/json",
-					},
-					"method": "POST",
-					"id":     srcId,
-					"body": base.Json{
-						"drive_id":          d.DriveId,
-						"file_id":           srcId,
-						"to_drive_id":       d.DriveId,
-						"to_parent_file_id": dstId,
-					},
-					"url": url,
+	res, err, _ := d.requestS("https://api.alipan.com/v3/batch", http.MethodPost, base.Json{
+		"requests": []base.Json{
+			{
+				"headers": base.Json{
+					"Content-Type": "application/json",
 				},
+				"method": "POST",
+				"id":     srcId,
+				"body": base.Json{
+					"drive_id":          d.DriveId,
+					"file_id":           srcId,
+					"to_drive_id":       d.DriveId,
+					"to_parent_file_id": dstId,
+				},
+				"url": url,
 			},
-			"resource": "file",
-		})
-	}, nil)
+		},
+		"resource": "file",
+	}, nil, nil)
 	if err != nil {
 		return err
 	}
@@ -201,4 +239,63 @@ func (d *AliDrive) batch(srcId, dstId string, url string) error {
 		return nil
 	}
 	return errors.New(string(res))
+}
+
+func (d *AliDrive) getSign(timestamp, nonce string) (string, error) {
+	req := base.RestyClient.R()
+	state, _ := global.Load(d.UserID)
+	data := base.Json{
+		"device_id": state.deviceID,
+		"timestamp": timestamp,
+		"uuid":      nonce,
+	}
+	req.SetBody(data)
+	res, err := req.Execute(http.MethodPost, d.HookAddress+"/encrypt")
+	if err != nil {
+		return "", err
+	}
+	return string(res.Body()), nil
+}
+
+func (d *AliDrive) decryptURL(encryptURL string) (string, error) {
+	req := base.RestyClient.R()
+	data := base.Json{
+		"encrypt_url": encryptURL,
+	}
+	req.SetBody(data)
+	res, err := req.Execute(http.MethodPost, d.HookAddress+"/decrypt")
+	if err != nil {
+		return "", err
+	}
+	return string(res.Body()), nil
+}
+
+func (d *AliDrive) generateSecurityHeader(url string) (base.Json, error) {
+	req := base.RestyClient.R()
+	data := base.Json{
+		"url": url,
+	}
+	req.SetBody(data)
+	res, err := req.Execute(http.MethodPost, d.HookAddress+"/generateSecurityHeader")
+	if err != nil {
+		return nil, err
+	}
+	var result base.Json
+	err = json.Unmarshal(res.Body(), &result)
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (d *AliDrive) refreshDriveId(ctx context.Context) error {
+	infoHeader := map[string]string{
+		"host": "user.alipan.com",
+	}
+	res, err, _ := d.requestS("https://bizapi.alipan.com/v2/user/get", http.MethodPost, nil, infoHeader, nil)
+	if err != nil {
+		return err
+	}
+	d.DriveId = utils.Json.Get(res, d.DriveType+"_drive_id").ToString()
+	return nil
 }

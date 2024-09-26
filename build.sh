@@ -8,6 +8,7 @@ if [ "$1" = "dev" ]; then
   version="dev"
   webVersion="dev"
 else
+  git tag -d beta
   version=$(git describe --abbrev=0 --tags)
   webVersion=$(wget -qO- -t1 -T2 "https://api.github.com/repos/alist-org/alist-web/releases/latest" | grep "tag_name" | head -n 1 | awk -F ":" '{print $2}' | sed 's/\"//g;s/,//g;s/ //g')
 fi
@@ -267,6 +268,8 @@ if [ "$1" = "dev" ]; then
     BuildDocker
   elif [ "$2" = "docker-multiplatform" ]; then
       BuildDockerMultiplatform
+  elif [ "$2" = "web" ]; then
+    echo "web only"
   else
     BuildDev
   fi
@@ -285,6 +288,8 @@ elif [ "$1" = "release" ]; then
   elif [ "$2" = "android" ]; then
     BuildReleaseAndroid
     MakeRelease "md5-android.txt"
+  elif [ "$2" = "web" ]; then
+    echo "web only"
   else
     BuildRelease
     MakeRelease "md5.txt"
@@ -293,6 +298,8 @@ elif [ "$1" = "prepare" ]; then
   if [ "$2" = "docker-multiplatform" ]; then
     PrepareBuildDockerMusl
   fi
+elif [ "$1" = "zip" ]; then
+  MakeRelease "$2".txt
 else
   echo -e "Parameter error"
 fi

@@ -13,6 +13,10 @@ type Addition struct {
 	OrderDirection string `json:"order_direction" type:"select" options:"ASC,DESC"`
 	RapidUpload    bool   `json:"rapid_upload"`
 	InternalUpload bool   `json:"internal_upload"`
+	DriveType      string `json:"drive_type" type:"select" options:"default,resource,backup" default:"default"`
+	HookAddress    string `json:"hook_address"`
+	UserAgent      string `json:"user_agent" default:"AliApp(AYSD/6.4.0) com.alicloud.databox/40180722 Channel/36176927979800@rimet_android_6.4.0 language/zh-CN /Android Mobile/samsung samsung+SM-G9810"`
+	XCanary        string `json:"x_canary" default:"client=Android,app=adrive,version=v6.4.0"`
 }
 
 var config = driver.Config{

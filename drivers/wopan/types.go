@@ -1,8 +1,8 @@
 package template
 
 import (
-	"github.com/Xhofe/wopan-sdk-go"
 	"github.com/alist-org/alist/v3/internal/model"
+	"github.com/xhofe/wopan-sdk-go"
 )
 
 type Object struct {
@@ -10,7 +10,7 @@ type Object struct {
 	FID string
 }
 
-func fileToObj(file wopan.File) (model.Obj, error) {
+func fileToObj(file *wopan.File) (model.Obj, error) {
 	t, err := getTime(file.CreateTime)
 	if err != nil {
 		return nil, err

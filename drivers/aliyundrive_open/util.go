@@ -3,8 +3,11 @@ package aliyundrive_open
 import (
 	"context"
 	"encoding/base64"
+	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/deatil/go-cryptobin/cryptobin/crypto"
 	"net/http"
 	"strings"
 	"time"
@@ -119,7 +122,11 @@ func (d *AliyundriveOpen) requestReturnErrResp(uri, method string, callback base
 	isRetry := len(retry) > 0 && retry[0]
 	if e.Code != "" {
 		if !isRetry && (utils.SliceContains([]string{"AccessTokenInvalid", "AccessTokenExpired", "I400JD"}, e.Code) || d.AccessToken == "") {
-			err = d.refreshToken()
+			if d.UseTVAuth {
+				err = d.getRefreshTokenByTV(d.RefreshToken, true)
+			} else {
+				err = d.refreshToken()
+			}
 			if err != nil {
 				return nil, err, nil
 			}
@@ -175,4 +182,113 @@ func getNowTime() (time.Time, string) {
 	nowTime := time.Now()
 	nowTimeStr := nowTime.Format("2006-01-02T15:04:05.000Z")
 	return nowTime, nowTimeStr
+}
+
+func (d *AliyundriveOpen) getSID() error {
+	url := "http://api.extscreen.com/aliyundrive/qrcode"
+	var resp SIDResp
+	_, err := base.RestyClient.R().
+		SetBody(base.Json{
+			"scopes": "user:base,file:all:read,file:all:write",
+			"width":  500,
+			"height": 500,
+		}).
+		SetResult(&resp).
+		Post(url)
+	if err != nil {
+		return err
+	}
+	d.SID = resp.Data.SID
+	op.MustSaveDriverStorage(d)
+	authURL := fmt.Sprintf("https://www.aliyundrive.com/o/oauth/authorize?sid=%s", resp.Data.SID)
+	return fmt.Errorf(`need verify: <a target="_blank" href="%s">Click Here</a>`, authURL)
+}
+
+func (d *AliyundriveOpen) getRefreshTokenBySID() error {
+	// 获取 authCode
+	authCode := ""
+	url := "https://openapi.alipan.com/oauth/qrcode/" + d.SID + "/status"
+	time.Sleep(time.Second) // 等待 阿里云盘那边更新SID状态
+	var resp RefreshTokenSIDResp
+	_, err := base.RestyClient.R().
+		SetResult(&resp).
+		Get(url)
+	if err != nil {
+		return err
+	}
+	if resp.Status != "LoginSuccess" {
+		return fmt.Errorf("failed to get auth code: %s", resp.Status)
+
+	} else {
+		authCode = resp.AuthCode
+	}
+	return d.getRefreshTokenByTV(authCode, false)
+}
+
+func (d *AliyundriveOpen) getRefreshTokenByTV(code string, isRefresh bool) error {
+	refresh, access, err := d._getRefreshTokenByTV(code, isRefresh)
+	for i := 0; i < 3; i++ {
+		if err == nil {
+			break
+		} else {
+			log.Errorf("[ali_open] failed to refresh token: %s", err)
+		}
+		refresh, access, err = d._getRefreshTokenByTV(code, isRefresh)
+	}
+	if err != nil {
+		return err
+	}
+	log.Infof("[ali_open] token exchange: %s -> %s", d.RefreshToken, refresh)
+	d.RefreshToken, d.AccessToken = refresh, access
+	op.MustSaveDriverStorage(d)
+	return nil
+}
+
+func (d *AliyundriveOpen) _getRefreshTokenByTV(code string, isRefresh bool) (refreshToken, accessToken string, err error) {
+	url := "http://api.extscreen.com/aliyundrive/v2/token"
+	var resp RefreshTokenAuthResp
+	body := ""
+	if isRefresh {
+		body = fmt.Sprintf("refresh_token=%s", code)
+	} else {
+		body = fmt.Sprintf("code=%s", code)
+	}
+
+	res, err := base.RestyClient.R().
+		SetHeader("Content-Type", "application/x-www-form-urlencoded").
+		SetBody(body).
+		SetResult(&resp).
+		Post(url)
+	if err != nil {
+		return "", "", err
+	}
+	v, err := _decryptForTV(resp.Data.CipherText, resp.Data.IV)
+	if err != nil {
+		return "", "", err
+	}
+	refresh, access := v.RefreshToken, v.AccessToken
+	if refresh == "" {
+		return "", "", fmt.Errorf("failed to refresh token: refresh token is empty, resp: %s", res.String())
+	}
+	return refresh, access, nil
+}
+
+func _decryptForTV(cipherText, iv string) (*ResData, error) {
+	cipher, err := base64.StdEncoding.DecodeString(cipherText)
+	if err != nil {
+		return nil, err
+	}
+	iV, err := hex.DecodeString(iv)
+	if err != nil {
+		return nil, err
+	}
+	res := crypto.FromBytes(cipher).SetKey("^(i/x>>5(ebyhumz*i1wkpk^orIs^Na.").SetIv(string(iV)).Aes().CBC().PKCS7Padding().Decrypt()
+	fmt.Println(string(res.ToBytes()))
+	fmt.Println(res.Error())
+	v := new(ResData)
+	if err := json.Unmarshal(res.ToBytes(), v); err != nil {
+		return nil, err
+
+	}
+	return v, nil
 }

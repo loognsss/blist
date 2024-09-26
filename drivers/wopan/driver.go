@@ -5,12 +5,12 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/Xhofe/wopan-sdk-go"
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/model"
 	"github.com/alist-org/alist/v3/internal/op"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/go-resty/resty/v2"
+	"github.com/xhofe/wopan-sdk-go"
 )
 
 type Wopan struct {
@@ -152,10 +152,16 @@ func (d *Wopan) Remove(ctx context.Context, obj model.Obj) error {
 }
 
 func (d *Wopan) Put(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) error {
-	_, err := d.client.Upload2C(d.getSpaceType(), wopan.Upload2CFile{
+	file, err := convertToFile(stream)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = d.client.Upload2C(d.getSpaceType(), wopan.Upload2CFile{
 		Name:        stream.GetName(),
 		Size:        stream.GetSize(),
-		Content:     stream,
+		Content:     file,
 		ContentType: stream.GetMimetype(),
 	}, dstDir.GetID(), d.FamilyID, wopan.Upload2COption{
 		OnProgress: func(current, total int64) {

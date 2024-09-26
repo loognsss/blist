@@ -17,8 +17,7 @@ jobs:
         platform: [ubuntu-latest]
         go-version: [ '1.21' ]
     name: Build
-    # runs-on: ${{ matrix.platform }}
-    runs-on: fiberState
+    runs-on: ${{ matrix.platform }}
     steps:
       - name: Setup Go
         uses: actions/setup-go@v5
@@ -28,7 +27,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - uses: benjlevesque/short-sha@v2.2
+      - uses: benjlevesque/short-sha@v3.0
         id: short-sha
 
       - name: Install dependencies
