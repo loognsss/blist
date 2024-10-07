@@ -79,7 +79,6 @@ func (d *HalalCloud) NewAuthServiceWithOauth(options ...HalalOption) (*AuthServi
 	}
 
 	if oauthToken.Url != "" {
-
 		return nil, fmt.Errorf(`need verify: <a target="_blank" href="%s">Click Here</a>`, oauthToken.Url)
 	}
 
@@ -117,7 +116,6 @@ func (d *HalalCloud) NewAuthService(refreshToken string, options ...HalalOption)
 		err := invoker(ctxx, method, req, reply, cc, opts...) // invoking RPC method
 		if err != nil {
 			grpcStatus, ok := status.FromError(err)
-
 			if ok && grpcStatus.Code() == codes.Unauthenticated && strings.Contains(grpcStatus.Err().Error(), "invalid accesstoken") && len(refreshToken) > 0 {
 				// refresh token
 				refreshResponse, err := pbPublicUser.NewPubUserClient(cc).Refresh(ctx, &pbPublicUser.Token{

@@ -8,6 +8,7 @@ import (
 	"github.com/alist-org/alist/v3/internal/search/searcher"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/meilisearch/meilisearch-go"
+	"time"
 )
 
 var config = searcher.Config{
@@ -18,10 +19,10 @@ var config = searcher.Config{
 func init() {
 	searcher.RegisterSearcher(config, func() (searcher.Searcher, error) {
 		m := Meilisearch{
-			Client: meilisearch.NewClient(meilisearch.ClientConfig{
-				Host:   conf.Conf.Meilisearch.Host,
-				APIKey: conf.Conf.Meilisearch.APIKey,
-			}),
+			Client: meilisearch.New(
+				conf.Conf.Meilisearch.Host,
+				meilisearch.WithAPIKey(conf.Conf.Meilisearch.APIKey),
+			),
 			IndexUid:             conf.Conf.Meilisearch.IndexPrefix + "alist",
 			FilterableAttributes: []string{"parent", "is_dir", "name"},
 			SearchableAttributes: []string{"name"},
@@ -39,7 +40,7 @@ func init() {
 				if err != nil {
 					return nil, err
 				}
-				forTask, err := m.Client.WaitForTask(task.TaskUID)
+				forTask, err := m.Client.WaitForTask(task.TaskUID, time.Second)
 				if err != nil {
 					return nil, err
 				}
