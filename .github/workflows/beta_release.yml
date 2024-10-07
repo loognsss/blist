@@ -67,7 +67,7 @@ jobs:
           - target: 'android-*' #android
             hash: "md5-android"
     name: Beta Release
-    runs-on: ubuntu-latest
+    runs-on: self-hosted
     steps:
       - name: Checkout
         uses: actions/checkout@v4
