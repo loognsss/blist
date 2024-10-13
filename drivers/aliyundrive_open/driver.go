@@ -95,8 +95,10 @@ func (d *AliyundriveOpen) link(ctx context.Context, file model.Obj) (*model.Link
 	}
 	exp := time.Minute
 	return &model.Link{
-		URL:        url,
-		Expiration: &exp,
+		URL:         url,
+		Expiration:  &exp,
+		Concurrency: 5,
+		PartSize:    10 * utils.MB,
 	}, nil
 }
 
