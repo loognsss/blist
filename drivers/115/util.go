@@ -10,7 +10,6 @@ import (
 	"io"
 	"net/http"
 	"net/url"
-	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -254,6 +253,7 @@ func (d *Pan115) UploadByMultipart(params *driver115.UploadOSSParams, fileSize i
 		ossClient *oss.Client
 		bucket    *oss.Bucket
 		ossToken  *driver115.UploadOSSTokenResp
+		bodyBytes []byte
 		err       error
 	)
 
@@ -268,12 +268,14 @@ func (d *Pan115) UploadByMultipart(params *driver115.UploadOSSParams, fileSize i
 			f(options)
 		}
 	}
+	// oss 启用Sequential必须按顺序上传
+	options.ThreadsNum = 1
 
 	if ossToken, err = d.client.GetOSSToken(); err != nil {
 		return err
 	}
 
-	if ossClient, err = oss.New(driver115.OSSEndpoint, ossToken.AccessKeyID, ossToken.AccessKeySecret); err != nil {
+	if ossClient, err = oss.New(driver115.OSSEndpoint, ossToken.AccessKeyID, ossToken.AccessKeySecret, oss.EnableMD5(true), oss.EnableCRC(true)); err != nil {
 		return err
 	}
 
@@ -294,6 +296,7 @@ func (d *Pan115) UploadByMultipart(params *driver115.UploadOSSParams, fileSize i
 	if imur, err = bucket.InitiateMultipartUpload(params.Object,
 		oss.SetHeader(driver115.OssSecurityTokenHeaderName, ossToken.SecurityToken),
 		oss.UserAgentHeader(driver115.OSSUserAgent),
+		oss.EnableSha1(), oss.Sequential(),
 	); err != nil {
 		return err
 	}
@@ -337,8 +340,7 @@ func (d *Pan115) UploadByMultipart(params *driver115.UploadOSSParams, fileSize i
 						continue
 					}
 
-					b := bytes.NewBuffer(buf)
-					if part, err = bucket.UploadPart(imur, b, chunk.Size, chunk.Number, driver115.OssOption(params, ossToken)...); err == nil {
+					if part, err = bucket.UploadPart(imur, bytes.NewBuffer(buf), chunk.Size, chunk.Number, driver115.OssOption(params, ossToken)...); err == nil {
 						break
 					}
 				}
@@ -373,41 +375,26 @@ LOOP:
 		}
 	}
 
-	// EOF错误是xml的Unmarshal导致的，响应其实是json格式，所以实际上上传是成功的
-	if _, err = bucket.CompleteMultipartUpload(imur, parts, driver115.OssOption(params, ossToken)...); err != nil && !errors.Is(err, io.EOF) {
-		// 当文件名含有 &< 这两个字符之一时响应的xml解析会出现错误，实际上上传是成功的
-		if filename := filepath.Base(stream.GetName()); !strings.ContainsAny(filename, "&<") {
-			return err
-		}
+	// 不知道啥原因，oss那边分片上传不计算sha1，导致115服务器校验错误
+	// params.Callback.Callback = strings.ReplaceAll(params.Callback.Callback, "${sha1}", params.SHA1)
+	if _, err := bucket.CompleteMultipartUpload(imur, parts, append(
+		driver115.OssOption(params, ossToken),
+		oss.CallbackResult(&bodyBytes),
+	)...); err != nil {
+		return err
 	}
-	return d.checkUploadStatus(dirID, params.SHA1)
+
+	var uploadResult UploadResult
+	if err = json.Unmarshal(bodyBytes, &uploadResult); err != nil {
+		return err
+	}
+	return uploadResult.Err(string(bodyBytes))
 }
 
 func chunksProducer(ch chan oss.FileChunk, chunks []oss.FileChunk) {
 	for _, chunk := range chunks {
 		ch <- chunk
 	}
-}
-
-func (d *Pan115) checkUploadStatus(dirID, sha1 string) error {
-	// 验证上传是否成功
-	req := d.client.NewRequest().ForceContentType("application/json;charset=UTF-8")
-	opts := []driver115.GetFileOptions{
-		driver115.WithOrder(driver115.FileOrderByTime),
-		driver115.WithShowDirEnable(false),
-		driver115.WithAsc(false),
-		driver115.WithLimit(500),
-	}
-	fResp, err := driver115.GetFiles(req, dirID, opts...)
-	if err != nil {
-		return err
-	}
-	for _, fileInfo := range fResp.Files {
-		if fileInfo.Sha1 == sha1 {
-			return nil
-		}
-	}
-	return driver115.ErrUploadFailed
 }
 
 func SplitFile(fileSize int64) (chunks []oss.FileChunk, err error) {

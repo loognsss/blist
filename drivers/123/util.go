@@ -30,6 +30,7 @@ const (
 	Api              = "https://www.123pan.com/api"
 	AApi             = "https://www.123pan.com/a/api"
 	BApi             = "https://www.123pan.com/b/api"
+	LoginApi         = "https://login.123pan.com/api"
 	MainApi          = Api
 	SignIn           = MainApi + "/user/sign_in"
 	Logout           = MainApi + "/user/logout"
@@ -109,6 +110,7 @@ func (d *Pan123) login() error {
 		body = base.Json{
 			"passport": d.Username,
 			"password": d.Password,
+			"remember": true,
 			"type":     1,
 		}
 	}

@@ -54,7 +54,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: build/musl-libs
-          key: docker-musl-libs
+          key: docker-musl-libs-v2
 
       - name: Download Musl Library
         if: steps.cache-musl.outputs.cache-hit != 'true'
@@ -85,7 +85,7 @@ jobs:
           push: ${{ github.event_name == 'push' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x,linux/ppc64le,linux/riscv64
 
       - name: Build and push with ffmpeg
         id: docker_build_ffmpeg
@@ -97,7 +97,7 @@ jobs:
           tags: ${{ steps.meta-ffmpeg.outputs.tags }}
           labels: ${{ steps.meta-ffmpeg.outputs.labels }}
           build-args: INSTALL_FFMPEG=true
-          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x
+          platforms: linux/amd64,linux/arm64,linux/arm/v7,linux/386,linux/arm/v6,linux/s390x,linux/ppc64le,linux/riscv64
 
   build_docker_with_aria2:
     needs: build_docker
