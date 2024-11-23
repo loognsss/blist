@@ -18,7 +18,7 @@ type Addition struct {
 	DeviceName   string `json:"devicename" default:"XiaoMi"`
 	DeiveType    string `json:"devicetype" default:"houji"`
 	OsVersion    string `json:"osversion" default:"14"`
-	LoginUuid    string `json:"loginuuid" default:"1fce20b2428d30899fd537f4cf231dfb"`
+	LoginUuid    string `json:"loginuuid" default:""`
 }
 
 var config = driver.Config{
