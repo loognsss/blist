@@ -40,7 +40,6 @@ jobs:
       - name: changelog # or changelogithub@0.12 if ensure the stable result
         id: changelog
         run: |
-          # sudo snap install upx
           git tag -l
           npx changelogithub --output CHANGELOG.md
 #          npx changelogen@latest --output CHANGELOG.md
