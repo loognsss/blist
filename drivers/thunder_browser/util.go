@@ -23,24 +23,26 @@ const (
 )
 
 var Algorithms = []string{
-	"uWRwO7gPfdPB/0NfPtfQO+71",
-	"F93x+qPluYy6jdgNpq+lwdH1ap6WOM+nfz8/V",
-	"0HbpxvpXFsBK5CoTKam",
-	"dQhzbhzFRcawnsZqRETT9AuPAJ+wTQso82mRv",
-	"SAH98AmLZLRa6DB2u68sGhyiDh15guJpXhBzI",
-	"unqfo7Z64Rie9RNHMOB",
-	"7yxUdFADp3DOBvXdz0DPuKNVT35wqa5z0DEyEvf",
-	"RBG",
-	"ThTWPG5eC0UBqlbQ+04nZAptqGCdpv9o55A",
+	"nk47aV86C3V",
+	"0I7SKwBIeDM",
+	"0nZR8",
+	"/qqq0PEpQ9u/wFniL",
+	"ytoigNqJ6Af+I+IQkM8mNRJ1m/3GHfw9",
+	"lf9L6+/2oz7Ck4k7QNpsq1",
+	"r8hcSn6OCX3rUDivdIjSJ/vEDWv",
+	"ApAK4g0DC1i+9gBVAaLb6Nsxzh5LI2iKnKeQQA/S1sJexGx24r",
+	"zckdAMJL6Pxh",
+	"PNcpnZaJB/0H+V+daGGMqU8352",
+	"Td1l0C3pjrs6j4MZ5zwN3ty52xLpKZd9I6CYirN",
 }
 
 const (
 	ClientID          = "ZUBzD9J_XPXfn7f7"
 	ClientSecret      = "yESVmHecEe6F0aou69vl-g"
-	ClientVersion     = "1.10.0.2633"
+	ClientVersion     = "1.27.0.5471"
 	PackageName       = "com.xunlei.browser"
 	DownloadUserAgent = "AndroidDownloadManager/13 (Linux; U; Android 13; M2004J7AC Build/SP1A.210812.016)"
-	SdkVersion        = "233100"
+	SdkVersion        = "509300"
 )
 
 const (
