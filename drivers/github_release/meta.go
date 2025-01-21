@@ -8,9 +8,9 @@ import (
 type Addition struct {
 	driver.RootID
 	// define other
-	Repo        string `json:"repo" required:"true" default:"AlistGo/alist"`
-	Token       string `json:"token" required:"true" default:""`
-	MaxReleases int    `json:"max_releases" required:"true" type:"number" default:"30" help:"max releases to list"`
+	Repo        string `json:"repo" required:"true" default:"AlistGo/alist" help:"Repository name(owner/repo)"`
+	Token       string `json:"token" required:"true" default:"" help:"Github personal access token"`
+	MaxReleases int    `json:"max_releases" required:"true" type:"number" default:"30" help:"Max releases to list"`
 }
 
 var config = driver.Config{
