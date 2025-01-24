@@ -7,8 +7,8 @@ import (
 
 const (
 	initialRetryInterval = 500 * time.Millisecond
-	maxInterval          = 1 * time.Minute
-	maxElapsedTime       = 15 * time.Minute
+	maxInterval          = 10 * time.Second
+	maxElapsedTime       = 30 * time.Second
 	randomizationFactor  = 0.5
 	multiplier           = 1.5
 )
