@@ -62,6 +62,8 @@ type Release struct {
 	BodyText        string    `json:"body_text"`
 	MentionsCount   int       `json:"mentions_count"`
 	DiscussionURL   string    `json:"discussion_url"`
+
+	latest bool
 }
 
 func (r *Release) UnmarshalJSON(data []byte) error {
@@ -101,7 +103,14 @@ func (r *Release) GetSize() int64 {
 	return 0
 }
 
+func (r *Release) SetLatestFlag(flag bool) {
+	r.latest = flag
+}
+
 func (r *Release) GetName() string {
+	if r.latest {
+		return fmt.Sprintf("latest(%s)", r.TagName)
+	}
 	return r.TagName
 }
 

@@ -216,3 +216,40 @@ func (a *ApiContext) GetReleaseAsset(repo repository, ID int64) (*Asset, error) 
 
 	return &asset, nil
 }
+
+var (
+	ErrNoRelease = errors.New("no release found")
+)
+
+// GetLatestRelease 获取最新 release.
+func (a *ApiContext) GetLatestRelease(repo repository) (model.Obj, error) {
+	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo.UrlEncode())
+	response, err := a.getWithRetry(url)
+	if err != nil {
+		return nil, err
+	}
+	defer response.Body.Close()
+
+	body, err := io.ReadAll(response.Body)
+	if err != nil {
+		return nil, errors.Wrap(err, "get latest release failed")
+	}
+
+	if response.StatusCode != http.StatusOK {
+		if response.StatusCode == http.StatusNotFound {
+			// identify no release
+			return nil, ErrNoRelease
+		}
+		return nil, parseHTTPError(body)
+	}
+
+	release := Release{}
+	err = utils.Json.Unmarshal(body, &release)
+	if err != nil {
+		return nil, errors.Wrap(err, "get latest release failed")
+	}
+
+	release.SetLatestFlag(true)
+
+	return &release, nil
+}
