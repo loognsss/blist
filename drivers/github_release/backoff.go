@@ -1,4 +1,4 @@
-package template
+package github_release
 
 import (
 	"math/rand"

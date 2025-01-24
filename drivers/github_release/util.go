@@ -1,1 +1,1 @@
-package template
+package github_release
