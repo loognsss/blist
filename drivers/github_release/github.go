@@ -1,6 +1,7 @@
 package template
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"net/http"
@@ -54,12 +55,29 @@ func parseHTTPError(body []byte) error {
 	return errors.New(message)
 }
 
+// sleepWithContext 在指定的时间内等待, 如果 context 被取消则提前返回.
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
+}
+
 // getWithRetry 获取 GitHub API 并重试.
-func (a *ApiContext) getWithRetry(url string) (*http.Response, error) {
+func (a *ApiContext) getWithRetry(ctx context.Context, url string) (*http.Response, error) {
 	backoff := Backoff{}
 
 	for {
-		response, err := a.get(url)
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+
+		response, err := a.get(ctx, url)
 
 		// non-2xx code does not cause error
 		if err != nil {
@@ -69,7 +87,10 @@ func (a *ApiContext) getWithRetry(url string) (*http.Response, error) {
 				return nil, errors.Wrap(err, "request failed")
 			}
 			utils.Log.Debugf("query github api error: %s, retry after %s", err, p)
-			time.Sleep(p)
+
+			if err := sleepWithContext(ctx, p); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
@@ -97,7 +118,10 @@ func (a *ApiContext) getWithRetry(url string) (*http.Response, error) {
 				return nil, parseHTTPError(body)
 			}
 			utils.Log.Debugf("query github api error: status code %d, retry after %s", response.StatusCode, p)
-			time.Sleep(p)
+
+			if err := sleepWithContext(ctx, p); err != nil {
+				return nil, err
+			}
 			continue
 		}
 
@@ -112,8 +136,8 @@ func (a *ApiContext) SetAuthHeader(header http.Header) {
 }
 
 // get 获取 GitHub API.
-func (a *ApiContext) get(url string) (*http.Response, error) {
-	request, err := http.NewRequest("GET", url, nil)
+func (a *ApiContext) get(ctx context.Context, url string) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -130,12 +154,12 @@ func (a *ApiContext) get(url string) (*http.Response, error) {
 }
 
 // GetReleases 获取仓库信息.
-func (a *ApiContext) GetReleases(repo repository, perPage int) ([]model.Obj, error) {
+func (a *ApiContext) GetReleases(ctx context.Context, repo repository, perPage int) ([]model.Obj, error) {
 	if perPage < 1 {
 		perPage = 30
 	}
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases?per_page=%d", repo.UrlEncode(), perPage)
-	response, err := a.getWithRetry(url)
+	response, err := a.getWithRetry(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -164,9 +188,9 @@ func (a *ApiContext) GetReleases(repo repository, perPage int) ([]model.Obj, err
 }
 
 // GetRelease 获取指定 tag 的 release.
-func (a *ApiContext) GetRelease(repo repository, id int64) (*Release, error) {
+func (a *ApiContext) GetRelease(ctx context.Context, repo repository, id int64) (*Release, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/%d", repo.UrlEncode(), id)
-	response, err := a.getWithRetry(url)
+	response, err := a.getWithRetry(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -191,9 +215,9 @@ func (a *ApiContext) GetRelease(repo repository, id int64) (*Release, error) {
 }
 
 // GetReleaseAsset 获取指定 tag 的 release 的 assets.
-func (a *ApiContext) GetReleaseAsset(repo repository, ID int64) (*Asset, error) {
+func (a *ApiContext) GetReleaseAsset(ctx context.Context, repo repository, ID int64) (*Asset, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/assets/%d", repo.UrlEncode(), ID)
-	response, err := a.getWithRetry(url)
+	response, err := a.getWithRetry(ctx, url)
 	if err != nil {
 		return nil, err
 	}
@@ -222,9 +246,9 @@ var (
 )
 
 // GetLatestRelease 获取最新 release.
-func (a *ApiContext) GetLatestRelease(repo repository) (model.Obj, error) {
+func (a *ApiContext) GetLatestRelease(ctx context.Context, repo repository) (model.Obj, error) {
 	url := fmt.Sprintf("https://api.github.com/repos/%s/releases/latest", repo.UrlEncode())
-	response, err := a.getWithRetry(url)
+	response, err := a.getWithRetry(ctx, url)
 	if err != nil {
 		return nil, err
 	}

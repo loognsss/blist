@@ -82,7 +82,7 @@ func (d *GithubRelease) listReleases(ctx context.Context, dir model.Obj, args mo
 	// Get latest release if enabled
 	if d.Addition.ShowLatest {
 		g.Go(func() error {
-			release, err := d.api.GetLatestRelease(d.repo)
+			release, err := d.api.GetLatestRelease(ctx, d.repo)
 			if err != nil {
 				if err == ErrNoRelease {
 					// for no release, just return
@@ -97,7 +97,7 @@ func (d *GithubRelease) listReleases(ctx context.Context, dir model.Obj, args mo
 
 	// Get all releases
 	g.Go(func() error {
-		r, err := d.api.GetReleases(d.repo, d.Addition.MaxReleases)
+		r, err := d.api.GetReleases(ctx, d.repo, d.Addition.MaxReleases)
 		if err != nil {
 			return errors.Wrap(err, "failed to get releases")
 		}
@@ -124,7 +124,7 @@ func (d *GithubRelease) listReleaseAssets(ctx context.Context, dir model.Obj, ar
 	if err != nil {
 		return nil, errors.Wrapf(err, "list release %s failed, id is not a number", idStr)
 	}
-	release, err := d.api.GetRelease(d.repo, id)
+	release, err := d.api.GetRelease(ctx, d.repo, id)
 	if err != nil {
 		return nil, err
 	}
@@ -145,7 +145,7 @@ func (d *GithubRelease) List(ctx context.Context, dir model.Obj, args model.List
 		return nil, errors.Wrapf(err, "list release %s failed, id is not a number", idStr)
 	}
 
-	release, err := d.api.GetRelease(d.repo, id)
+	release, err := d.api.GetRelease(ctx, d.repo, id)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get release")
 	}
@@ -177,7 +177,7 @@ func (d *GithubRelease) Link(ctx context.Context, file model.Obj, args model.Lin
 		return nil, errors.Wrapf(err, "get link of file %s failed, id is not a number", idStr)
 	}
 
-	asset, err := d.api.GetReleaseAsset(d.repo, id)
+	asset, err := d.api.GetReleaseAsset(ctx, d.repo, id)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get release asset")
 	}
