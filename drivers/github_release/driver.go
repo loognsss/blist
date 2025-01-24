@@ -20,7 +20,7 @@ type GithubRelease struct {
 	model.Storage
 	Addition
 
-	api  *ApiContext
+	api  *APIContext
 	repo repository
 }
 
@@ -56,7 +56,7 @@ func (d *GithubRelease) Init(ctx context.Context) error {
 		return err
 	}
 
-	d.api = NewApiContext(d.Addition.Token, nil)
+	d.api = NewAPIContext(d.Addition.Token, nil)
 
 	repo, err := newRepository(d.Addition.Repo)
 	if err != nil {
