@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/alist-org/alist/v3/drivers/base"
@@ -331,16 +332,16 @@ func (xc *XunLeiCommon) Remove(ctx context.Context, obj model.Obj) error {
 	return err
 }
 
-func (xc *XunLeiCommon) Put(ctx context.Context, dstDir model.Obj, stream model.FileStreamer, up driver.UpdateProgress) error {
-	hi := stream.GetHash()
+func (xc *XunLeiCommon) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) error {
+	hi := file.GetHash()
 	gcid := hi.GetHash(hash_extend.GCID)
 	if len(gcid) < hash_extend.GCID.Width {
-		tFile, err := stream.CacheFullInTempFile()
+		tFile, err := file.CacheFullInTempFile()
 		if err != nil {
 			return err
 		}
 
-		gcid, err = utils.HashFile(hash_extend.GCID, tFile, stream.GetSize())
+		gcid, err = utils.HashFile(hash_extend.GCID, tFile, file.GetSize())
 		if err != nil {
 			return err
 		}
@@ -352,8 +353,8 @@ func (xc *XunLeiCommon) Put(ctx context.Context, dstDir model.Obj, stream model.
 		r.SetBody(&base.Json{
 			"kind":        FILE,
 			"parent_id":   dstDir.GetID(),
-			"name":        stream.GetName(),
-			"size":        stream.GetSize(),
+			"name":        file.GetName(),
+			"size":        file.GetSize(),
 			"hash":        gcid,
 			"upload_type": UPLOAD_TYPE_RESUMABLE,
 		})
@@ -374,14 +375,17 @@ func (xc *XunLeiCommon) Put(ctx context.Context, dstDir model.Obj, stream model.
 			return err
 		}
 		uploader := s3manager.NewUploader(s)
-		if stream.GetSize() > s3manager.MaxUploadParts*s3manager.DefaultUploadPartSize {
-			uploader.PartSize = stream.GetSize() / (s3manager.MaxUploadParts - 1)
+		if file.GetSize() > s3manager.MaxUploadParts*s3manager.DefaultUploadPartSize {
+			uploader.PartSize = file.GetSize() / (s3manager.MaxUploadParts - 1)
 		}
 		_, err = uploader.UploadWithContext(ctx, &s3manager.UploadInput{
 			Bucket:  aws.String(param.Bucket),
 			Key:     aws.String(param.Key),
 			Expires: aws.Time(param.Expiration),
-			Body:    stream,
+			Body: driver.NewLimitedUploadStream(ctx, &driver.ReaderUpdatingProgress{
+				Reader:         file,
+				UpdateProgress: up,
+			}),
 		})
 		return err
 	}
@@ -521,4 +525,64 @@ func (xc *XunLeiCommon) IsLogin() bool {
 	}
 	_, err := xc.Request(XLUSER_API_URL+"/user/me", http.MethodGet, nil, nil)
 	return err == nil
+}
+
+// 离线下载文件
+func (xc *XunLeiCommon) OfflineDownload(ctx context.Context, fileUrl string, parentDir model.Obj, fileName string) (*OfflineTask, error) {
+	var resp OfflineDownloadResp
+	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
+		r.SetContext(ctx)
+		r.SetBody(&base.Json{
+			"kind":        FILE,
+			"name":        fileName,
+			"parent_id":   parentDir.GetID(),
+			"upload_type": UPLOAD_TYPE_URL,
+			"url": base.Json{
+				"url": fileUrl,
+			},
+		})
+	}, &resp)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return &resp.Task, err
+}
+
+/*
+获取离线下载任务列表
+*/
+func (xc *XunLeiCommon) OfflineList(ctx context.Context, nextPageToken string) ([]OfflineTask, error) {
+	res := make([]OfflineTask, 0)
+
+	var resp OfflineListResp
+	_, err := xc.Request(TASK_API_URL, http.MethodGet, func(req *resty.Request) {
+		req.SetContext(ctx).
+			SetQueryParams(map[string]string{
+				"type":       "offline",
+				"limit":      "10000",
+				"page_token": nextPageToken,
+			})
+	}, &resp)
+
+	if err != nil {
+		return nil, fmt.Errorf("failed to get offline list: %w", err)
+	}
+	res = append(res, resp.Tasks...)
+	return res, nil
+}
+
+func (xc *XunLeiCommon) DeleteOfflineTasks(ctx context.Context, taskIDs []string, deleteFiles bool) error {
+	_, err := xc.Request(TASK_API_URL, http.MethodDelete, func(req *resty.Request) {
+		req.SetContext(ctx).
+			SetQueryParams(map[string]string{
+				"task_ids":     strings.Join(taskIDs, ","),
+				"delete_files": strconv.FormatBool(deleteFiles),
+			})
+	}, nil)
+	if err != nil {
+		return fmt.Errorf("failed to delete tasks %v: %w", taskIDs, err)
+	}
+	return nil
 }

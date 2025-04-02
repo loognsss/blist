@@ -77,6 +77,9 @@ func getSub(token string) (string, error) {
 }
 
 func (d *AliyundriveOpen) refreshToken() error {
+	if d.ref != nil {
+		return d.ref.refreshToken()
+	}
 	refresh, access, err := d._refreshToken()
 	for i := 0; i < 3; i++ {
 		if err == nil {
@@ -103,7 +106,7 @@ func (d *AliyundriveOpen) request(uri, method string, callback base.ReqCallback,
 func (d *AliyundriveOpen) requestReturnErrResp(uri, method string, callback base.ReqCallback, retry ...bool) ([]byte, error, *ErrResp) {
 	req := base.RestyClient.R()
 	// TODO check whether access_token is expired
-	req.SetHeader("Authorization", "Bearer "+d.AccessToken)
+	req.SetHeader("Authorization", "Bearer "+d.getAccessToken())
 	if method == http.MethodPost {
 		req.SetHeader("Content-Type", "application/json")
 	}
@@ -182,6 +185,13 @@ func getNowTime() (time.Time, string) {
 	nowTime := time.Now()
 	nowTimeStr := nowTime.Format("2006-01-02T15:04:05.000Z")
 	return nowTime, nowTimeStr
+}
+
+func (d *AliyundriveOpen) getAccessToken() string {
+	if d.ref != nil {
+		return d.ref.getAccessToken()
+	}
+	return d.AccessToken
 }
 
 func (d *AliyundriveOpen) getSID() error {

@@ -227,11 +227,6 @@ func (h *Handler) handleGetHeadPost(w http.ResponseWriter, r *http.Request) (sta
 	if err != nil {
 		return http.StatusNotFound, err
 	}
-	etag, err := findETag(ctx, h.LockSystem, reqPath, fi)
-	if err != nil {
-		return http.StatusInternalServerError, err
-	}
-	w.Header().Set("ETag", etag)
 	if r.Method == http.MethodHead {
 		w.Header().Set("Content-Length", fmt.Sprintf("%d", fi.GetSize()))
 		return http.StatusOK, nil
@@ -263,7 +258,7 @@ func (h *Handler) handleGetHeadPost(w http.ResponseWriter, r *http.Request) (sta
 		w.Header().Set("Cache-Control", "max-age=0, no-cache, no-store, must-revalidate")
 		http.Redirect(w, r, u, http.StatusFound)
 	} else {
-		link, _, err := fs.Link(ctx, reqPath, model.LinkArgs{IP: utils.ClientIP(r), Header: r.Header, HttpReq: r})
+		link, _, err := fs.Link(ctx, reqPath, model.LinkArgs{IP: utils.ClientIP(r), Header: r.Header, HttpReq: r, Redirect: true})
 		if err != nil {
 			return http.StatusInternalServerError, err
 		}
@@ -361,7 +356,7 @@ func (h *Handler) handlePut(w http.ResponseWriter, r *http.Request) (status int,
 	if err != nil {
 		return http.StatusInternalServerError, err
 	}
-	w.Header().Set("ETag", etag)
+	w.Header().Set("Etag", etag)
 	return http.StatusCreated, nil
 }
 

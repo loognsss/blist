@@ -215,12 +215,12 @@ func (d *Pan115) Put(ctx context.Context, dstDir model.Obj, stream model.FileStr
 	var uploadResult *UploadResult
 	// 闪传失败，上传
 	if stream.GetSize() <= 10*utils.MB { // 文件大小小于10MB，改用普通模式上传
-		if uploadResult, err = d.UploadByOSS(&fastInfo.UploadOSSParams, stream, dirID); err != nil {
+		if uploadResult, err = d.UploadByOSS(ctx, &fastInfo.UploadOSSParams, stream, dirID, up); err != nil {
 			return nil, err
 		}
 	} else {
 		// 分片上传
-		if uploadResult, err = d.UploadByMultipart(&fastInfo.UploadOSSParams, stream.GetSize(), stream, dirID); err != nil {
+		if uploadResult, err = d.UploadByMultipart(ctx, &fastInfo.UploadOSSParams, stream.GetSize(), stream, dirID, up); err != nil {
 			return nil, err
 		}
 	}
@@ -241,7 +241,7 @@ func (d *Pan115) OfflineList(ctx context.Context) ([]*driver115.OfflineTask, err
 }
 
 func (d *Pan115) OfflineDownload(ctx context.Context, uris []string, dstDir model.Obj) ([]string, error) {
-	return d.client.AddOfflineTaskURIs(uris, dstDir.GetID())
+	return d.client.AddOfflineTaskURIs(uris, dstDir.GetID(), driver115.WithAppVer(appVer))
 }
 
 func (d *Pan115) DeleteOfflineTasks(ctx context.Context, hashes []string, deleteFiles bool) error {

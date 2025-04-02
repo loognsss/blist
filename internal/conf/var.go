@@ -1,14 +1,12 @@
 package conf
 
 import (
-	"golang.org/x/crypto/ssh"
 	"net/url"
 	"regexp"
 )
 
 var (
 	BuiltAt    string
-	GoVersion  string
 	GitAuthor  string
 	GitCommit  string
 	Version    string = "dev"
@@ -33,5 +31,3 @@ var (
 	ManageHtml   string
 	IndexHtml    string
 )
-
-var SSHSigners []ssh.Signer

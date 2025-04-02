@@ -241,6 +241,8 @@ func (d *Pan123) getTokenByUniID() (string, error) {
 }
 
 func (d *Pan123) request(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
+	isRetry := false
+do:
 	req := base.RestyClient.R()
 	req.SetHeaders(map[string]string{
 		/*		"origin":        "https://www.123pan.com",
@@ -294,7 +296,8 @@ func (d *Pan123) request(url string, method string, callback base.ReqCallback, r
 			if err != nil {
 				return nil, err
 			}
-			return d.request(url, method, callback, resp)
+			isRetry = true
+			goto do
 		}
 		return nil, errors.New(jsoniter.Get(body, "message").ToString())
 	}
@@ -326,7 +329,7 @@ func (d *Pan123) getFiles(ctx context.Context, parentId string, name string) ([]
 			"operateType":          "4",
 			"inDirectSpace":        "false",
 		}
-		_res, err := d.request(FileList, http.MethodGet, func(req *resty.Request) {
+		_res, err := d.Request(FileList, http.MethodGet, func(req *resty.Request) {
 			req.SetQueryParams(query)
 		}, &resp)
 		if err != nil {
