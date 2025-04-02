@@ -202,7 +202,7 @@ func (d *Pan123) loginByQrCode() error {
 
 func (d *Pan123) generateQrCode() (string, error) {
 	var resp QrCodeGenerateResp
-	_, err := d.request(QrcodeGenerate, http.MethodGet, nil, &resp)
+	_, err := d.Request(QrcodeGenerate, http.MethodGet, nil, &resp)
 	if err != nil {
 		return "", err
 	}
@@ -223,7 +223,7 @@ func (d *Pan123) generateQrCode() (string, error) {
 
 func (d *Pan123) getTokenByUniID() (string, error) {
 	var resp QrCodeResultResp
-	_, err := d.request(QrcodeResult, http.MethodGet, func(req *resty.Request) {
+	_, err := d.Request(QrcodeResult, http.MethodGet, func(req *resty.Request) {
 		req.SetQueryParam("uniID", d.Addition.UniID)
 	}, &resp)
 	if err != nil {
@@ -240,7 +240,7 @@ func (d *Pan123) getTokenByUniID() (string, error) {
 
 }
 
-func (d *Pan123) request(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
+func (d *Pan123) Request(url string, method string, callback base.ReqCallback, resp interface{}) ([]byte, error) {
 	isRetry := false
 do:
 	req := base.RestyClient.R()
@@ -285,13 +285,14 @@ do:
 	body := res.Body()
 	code := utils.Json.Get(body, "code").ToInt()
 	if code != 0 && code != 200 {
-		if code == 401 && d.Addition.UseQrCodeLogin == false {
+		if !isRetry && code == 401 && d.Addition.UseQrCodeLogin == false {
 			err := d.login()
 			if err != nil {
 				return nil, err
 			}
-			return d.request(url, method, callback, resp)
-		} else if code == 401 && d.Addition.UseQrCodeLogin == true {
+			isRetry = true
+			goto do
+		} else if !isRetry && code == 401 && d.Addition.UseQrCodeLogin == true {
 			err := d.loginByQrCode()
 			if err != nil {
 				return nil, err

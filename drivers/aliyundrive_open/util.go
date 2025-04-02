@@ -22,7 +22,7 @@ import (
 // do others that not defined in Driver interface
 
 func (d *AliyundriveOpen) _refreshToken() (string, string, error) {
-	url := d.base + "/oauth/access_token"
+	url := API_URL + "/oauth/access_token"
 	if d.OauthTokenURL != "" && d.ClientID == "" {
 		url = d.OauthTokenURL
 	}
@@ -115,7 +115,7 @@ func (d *AliyundriveOpen) requestReturnErrResp(uri, method string, callback base
 	}
 	var e ErrResp
 	req.SetError(&e)
-	res, err := req.Execute(method, d.base+uri)
+	res, err := req.Execute(method, API_URL+uri)
 	if err != nil {
 		if res != nil {
 			log.Errorf("[aliyundrive_open] request error: %s", res.String())

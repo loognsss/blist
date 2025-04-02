@@ -21,6 +21,7 @@ require (
 	github.com/charmbracelet/lipgloss v0.13.0
 	github.com/city404/v6-public-rpc-proto/go v0.0.0-20240817070657-90f8e24b653e
 	github.com/coreos/go-oidc v2.2.1+incompatible
+	github.com/deatil/go-cryptobin v1.0.5028
 	github.com/deckarep/golang-set/v2 v2.6.0
 	github.com/dhowden/tag v0.0.0-20240417053706-3d75831295e8
 	github.com/disintegration/imaging v1.6.2
@@ -43,7 +44,7 @@ require (
 	github.com/kdomanski/iso9660 v0.4.0
 	github.com/larksuite/oapi-sdk-go/v3 v3.3.1
 	github.com/maruel/natural v1.1.1
-	github.com/meilisearch/meilisearch-go v0.27.2
+	github.com/meilisearch/meilisearch-go v0.29.0
 	github.com/mholt/archives v0.1.0
 	github.com/minio/sio v0.4.0
 	github.com/natefinch/lumberjack v2.0.0+incompatible
@@ -231,7 +232,7 @@ require (
 	github.com/shabbyrobe/gocovmerge v0.0.0-20230507112040-c3350d9342df // indirect
 	github.com/shirou/gopsutil/v3 v3.24.4 // indirect
 	github.com/shoenig/go-m1cpu v0.1.6 // indirect
-	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e // indirect
+	github.com/skip2/go-qrcode v0.0.0-20200617195104-da1b6568686e
 	github.com/spaolacci/murmur3 v1.1.0 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/tklauser/go-sysconf v0.3.13 // indirect
@@ -239,8 +240,6 @@ require (
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/u2takey/go-utils v0.3.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
-	github.com/valyala/bytebufferpool v1.0.0 // indirect
-	github.com/valyala/fasthttp v1.37.1-0.20220607072126-8a320890c08d // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/xhofe/gsync v0.0.0-20230917091818-2111ceb38a25 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
