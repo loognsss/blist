@@ -29,10 +29,6 @@ type FileUploadProxy struct {
 
 func uploadAuth(ctx context.Context, path string) error {
 	user := ctx.Value("user").(*model.User)
-	path, err := user.JoinPath(path)
-	if err != nil {
-		return err
-	}
 	meta, err := op.GetNearestMeta(stdpath.Dir(path))
 	if err != nil {
 		if !errors.Is(errors.Cause(err), errs.MetaNotFound) {
@@ -63,11 +59,16 @@ func (f *FileUploadProxy) Read(p []byte) (n int, err error) {
 }
 
 func (f *FileUploadProxy) Write(p []byte) (n int, err error) {
-	return f.buffer.Write(p)
+	n, err = f.buffer.Write(p)
+	if err != nil {
+		return
+	}
+	err = stream.ClientUploadLimit.WaitN(f.ctx, n)
+	return
 }
 
 func (f *FileUploadProxy) Seek(offset int64, whence int) (int64, error) {
-	return 0, errs.NotSupport
+	return f.buffer.Seek(offset, whence)
 }
 
 func (f *FileUploadProxy) Close() error {
@@ -100,7 +101,6 @@ func (f *FileUploadProxy) Close() error {
 		WebPutAsTask: true,
 	}
 	s.SetTmpFile(f.buffer)
-	s.Closers.Add(f.buffer)
 	_, err = fs.PutAsTask(f.ctx, dir, s)
 	return err
 }
@@ -131,7 +131,7 @@ func (f *FileUploadWithLengthProxy) Read(p []byte) (n int, err error) {
 	return 0, errs.NotSupport
 }
 
-func (f *FileUploadWithLengthProxy) Write(p []byte) (n int, err error) {
+func (f *FileUploadWithLengthProxy) write(p []byte) (n int, err error) {
 	if f.pipeWriter != nil {
 		select {
 		case e := <-f.errChan:
@@ -176,6 +176,15 @@ func (f *FileUploadWithLengthProxy) Write(p []byte) (n int, err error) {
 		f.pFirst = 512
 		return len(p), nil
 	}
+}
+
+func (f *FileUploadWithLengthProxy) Write(p []byte) (n int, err error) {
+	n, err = f.write(p)
+	if err != nil {
+		return
+	}
+	err = stream.ClientUploadLimit.WaitN(f.ctx, n)
+	return
 }
 
 func (f *FileUploadWithLengthProxy) Seek(offset int64, whence int) (int64, error) {

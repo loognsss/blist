@@ -25,7 +25,7 @@ func (d *Pan123) getS3PreSignedUrls(ctx context.Context, upReq *UploadResp, star
 		"StorageNode":     upReq.Data.StorageNode,
 	}
 	var s3PreSignedUrls S3PreSignedURLs
-	_, err := d.request(S3PreSignedUrls, http.MethodPost, func(req *resty.Request) {
+	_, err := d.Request(S3PreSignedUrls, http.MethodPost, func(req *resty.Request) {
 		req.SetBody(data).SetContext(ctx)
 	}, &s3PreSignedUrls)
 	if err != nil {
@@ -44,7 +44,7 @@ func (d *Pan123) getS3Auth(ctx context.Context, upReq *UploadResp, start, end in
 		"uploadId":        upReq.Data.UploadId,
 	}
 	var s3PreSignedUrls S3PreSignedURLs
-	_, err := d.request(S3Auth, http.MethodPost, func(req *resty.Request) {
+	_, err := d.Request(S3Auth, http.MethodPost, func(req *resty.Request) {
 		req.SetBody(data).SetContext(ctx)
 	}, &s3PreSignedUrls)
 	if err != nil {
@@ -63,13 +63,13 @@ func (d *Pan123) completeS3(ctx context.Context, upReq *UploadResp, file model.F
 		"key":         upReq.Data.Key,
 		"uploadId":    upReq.Data.UploadId,
 	}
-	_, err := d.request(UploadCompleteV2, http.MethodPost, func(req *resty.Request) {
+	_, err := d.Request(UploadCompleteV2, http.MethodPost, func(req *resty.Request) {
 		req.SetBody(data).SetContext(ctx)
 	}, nil)
 	return err
 }
 
-func (d *Pan123) newUpload(ctx context.Context, upReq *UploadResp, file model.FileStreamer, reader io.Reader, up driver.UpdateProgress) error {
+func (d *Pan123) newUpload(ctx context.Context, upReq *UploadResp, file model.FileStreamer, up driver.UpdateProgress) error {
 	chunkSize := int64(1024 * 1024 * 16)
 	// fetch s3 pre signed urls
 	chunkCount := int(math.Ceil(float64(file.GetSize()) / float64(chunkSize)))
@@ -81,6 +81,7 @@ func (d *Pan123) newUpload(ctx context.Context, upReq *UploadResp, file model.Fi
 		batchSize = 10
 		getS3UploadUrl = d.getS3PreSignedUrls
 	}
+	limited := driver.NewLimitedUploadStream(ctx, file)
 	for i := 1; i <= chunkCount; i += batchSize {
 		if utils.IsCanceled(ctx) {
 			return ctx.Err()
@@ -103,7 +104,7 @@ func (d *Pan123) newUpload(ctx context.Context, upReq *UploadResp, file model.Fi
 			if j == chunkCount {
 				curSize = file.GetSize() - (int64(chunkCount)-1)*chunkSize
 			}
-			err = d.uploadS3Chunk(ctx, upReq, s3PreSignedUrls, j, end, io.LimitReader(reader, chunkSize), curSize, false, getS3UploadUrl)
+			err = d.uploadS3Chunk(ctx, upReq, s3PreSignedUrls, j, end, io.LimitReader(limited, chunkSize), curSize, false, getS3UploadUrl)
 			if err != nil {
 				return err
 			}
