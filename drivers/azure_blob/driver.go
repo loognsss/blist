@@ -296,7 +296,7 @@ func (d *AzureBlob) Put(ctx context.Context, dstDir model.Obj, stream model.File
 	// Set content MD5 hash if available
 	base64MD5 := stream.GetHash().GetHash(utils.MD5)
 	if base64MD5 != "" {
-		// covert base64 to hex byte
+		// convert base64 to hex byte
 		md5, err := base64.StdEncoding.DecodeString(base64MD5)
 		if err == nil && len(md5) == 16 {
 			options.HTTPHeaders.BlobContentMD5 = md5
