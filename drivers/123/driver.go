@@ -2,13 +2,10 @@ package _123
 
 import (
 	"context"
-	"crypto/md5"
 	"encoding/base64"
-	"encoding/hex"
 	"fmt"
 	"github.com/google/uuid"
 	"golang.org/x/time/rate"
-	"io"
 	"net/http"
 	"net/url"
 	"strings"
@@ -19,6 +16,7 @@ import (
 	"github.com/alist-org/alist/v3/internal/driver"
 	"github.com/alist-org/alist/v3/internal/errs"
 	"github.com/alist-org/alist/v3/internal/model"
+	"github.com/alist-org/alist/v3/internal/stream"
 	"github.com/alist-org/alist/v3/pkg/utils"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -212,25 +210,12 @@ func (d *Pan123) Remove(ctx context.Context, obj model.Obj) error {
 
 func (d *Pan123) Put(ctx context.Context, dstDir model.Obj, file model.FileStreamer, up driver.UpdateProgress) error {
 	etag := file.GetHash().GetHash(utils.MD5)
+	var err error
 	if len(etag) < utils.MD5.Width {
-		// const DEFAULT int64 = 10485760
-		h := md5.New()
-		// need to calculate md5 of the full content
-		tempFile, err := file.CacheFullInTempFile()
+		_, etag, err = stream.CacheFullInTempFileAndHash(file, utils.MD5)
 		if err != nil {
 			return err
 		}
-		defer func() {
-			_ = tempFile.Close()
-		}()
-		if _, err = utils.CopyWithBuffer(h, tempFile); err != nil {
-			return err
-		}
-		_, err = tempFile.Seek(0, io.SeekStart)
-		if err != nil {
-			return err
-		}
-		etag = hex.EncodeToString(h.Sum(nil))
 	}
 	data := base.Json{
 		"driveId":      0,
