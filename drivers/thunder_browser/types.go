@@ -304,7 +304,7 @@ type UploadTaskResponse struct {
 	File Files `json:"file"`
 }
 
-// 添加离线下载响应
+// OfflineDownloadResp 离线下载响应
 type OfflineDownloadResp struct {
 	File       *string     `json:"file"`
 	Task       OfflineTask `json:"task"`
@@ -314,14 +314,14 @@ type OfflineDownloadResp struct {
 	} `json:"url"`
 }
 
-// 离线下载列表
+// OfflineListResp 离线下载列表响应
 type OfflineListResp struct {
 	ExpiresIn     int64         `json:"expires_in"`
 	NextPageToken string        `json:"next_page_token"`
 	Tasks         []OfflineTask `json:"tasks"`
 }
 
-// offlineTask
+// OfflineTask 离线下载任务响应
 type OfflineTask struct {
 	Callback    string   `json:"callback"`
 	CreatedTime string   `json:"created_time"`

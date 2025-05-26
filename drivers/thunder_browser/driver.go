@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"strconv"
 	"strings"
+	"time"
 
 	"github.com/alist-org/alist/v3/drivers/base"
 	"github.com/alist-org/alist/v3/internal/driver"
@@ -66,6 +66,7 @@ func (x *ThunderBrowser) Init(ctx context.Context) (err error) {
 				UserAgent:         BuildCustomUserAgent(utils.GetMD5EncodeStr(x.Username+x.Password), PackageName, SdkVersion, ClientVersion, PackageName),
 				DownloadUserAgent: DownloadUserAgent,
 				UseVideoUrl:       x.UseVideoUrl,
+				UseFluentPlay:     x.UseFluentPlay,
 				RemoveWay:         x.Addition.RemoveWay,
 				refreshCTokenCk: func(token string) {
 					x.CaptchaToken = token
@@ -109,6 +110,7 @@ func (x *ThunderBrowser) Init(ctx context.Context) (err error) {
 	}
 
 	x.XunLeiBrowserCommon.UseVideoUrl = x.UseVideoUrl
+	x.XunLeiBrowserCommon.UseFluentPlay = x.UseFluentPlay
 	x.Addition.RootFolderID = x.RootFolderID
 	// 防止重复登录
 	identity := x.GetIdentity()
@@ -201,8 +203,9 @@ func (x *ThunderBrowserExpert) Init(ctx context.Context) (err error) {
 					}
 					return DownloadUserAgent
 				}(),
-				UseVideoUrl: x.UseVideoUrl,
-				RemoveWay:   x.ExpertAddition.RemoveWay,
+				UseVideoUrl:   x.UseVideoUrl,
+				UseFluentPlay: x.UseFluentPlay,
+				RemoveWay:     x.ExpertAddition.RemoveWay,
 				refreshCTokenCk: func(token string) {
 					x.CaptchaToken = token
 					op.MustSaveDriverStorage(x)
@@ -233,6 +236,7 @@ func (x *ThunderBrowserExpert) Init(ctx context.Context) (err error) {
 			op.MustSaveDriverStorage(x)
 		}
 		x.XunLeiBrowserCommon.UseVideoUrl = x.UseVideoUrl
+		x.XunLeiBrowserCommon.UseFluentPlay = x.UseFluentPlay
 		x.ExpertAddition.RootFolderID = x.RootFolderID
 		// 签名方法
 		if x.SignType == "captcha_sign" {
@@ -310,6 +314,7 @@ func (x *ThunderBrowserExpert) Init(ctx context.Context) (err error) {
 		x.XunLeiBrowserCommon.UserAgent = x.UserAgent
 		x.XunLeiBrowserCommon.DownloadUserAgent = x.DownloadUserAgent
 		x.XunLeiBrowserCommon.UseVideoUrl = x.UseVideoUrl
+		x.XunLeiBrowserCommon.UseFluentPlay = x.UseFluentPlay
 		x.ExpertAddition.RootFolderID = x.RootFolderID
 	}
 
@@ -649,10 +654,20 @@ func (xc *XunLeiBrowserCommon) Request(url string, method string, callback base.
 				return nil, err
 			}
 		}
-		return nil, err
+
+		return nil, errors.New(errResp.ErrorMsg)
 	default:
+		// 处理未捕获到的验证码错误
+		if errResp.ErrorMsg == "captcha_invalid" {
+			// 验证码token过期
+			if err = xc.RefreshCaptchaTokenAtLogin(GetAction(method, url), xc.TokenResp.UserID); err != nil {
+				return nil, err
+			}
+		}
+
 		return nil, err
 	}
+
 	return xc.Request(url, method, callback, resp)
 }
 
@@ -733,12 +748,42 @@ func (xc *XunLeiBrowserCommon) IsLogin() bool {
 	return err == nil
 }
 
-// 离线下载文件
+// OfflineDownload 离线下载文件
 func (xc *XunLeiBrowserCommon) OfflineDownload(ctx context.Context, fileUrl string, parentDir model.Obj, fileName string) (*OfflineTask, error) {
 	var resp OfflineDownloadResp
-	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
-		r.SetContext(ctx)
-		r.SetBody(&base.Json{
+
+	body := base.Json{}
+
+	from := "cloudadd/"
+
+	if xc.UseFluentPlay {
+		body = base.Json{
+			"kind": FILE,
+			"name": fileName,
+			// 流畅播接口 强制将文件放在 "SPACE_FAVORITE" 文件夹
+			//"parent_id":   parentDir.GetID(),
+			"upload_type": UPLOAD_TYPE_URL,
+			"url": base.Json{
+				"url": fileUrl,
+				//"files": []string{"0"}, // 0 表示只下载第一个文件
+			},
+			"params": base.Json{
+				"cookie":      "null",
+				"web_title":   "",
+				"lastSession": "",
+				"flags":       "9",
+				"scene":       "smart_spot_panel",
+				"referer":     "https://x.xunlei.com",
+				"dedup_index": "0",
+			},
+			"need_dedup":  true,
+			"folder_type": "FAVORITE",
+			"space":       ThunderBrowserDriveFluentPlayFolderType,
+		}
+
+		from = "FLUENT_PLAY/sniff_ball/fluent_play/SPACE_FAVORITE"
+	} else {
+		body = base.Json{
 			"kind":        FILE,
 			"name":        fileName,
 			"parent_id":   parentDir.GetID(),
@@ -746,8 +791,20 @@ func (xc *XunLeiBrowserCommon) OfflineDownload(ctx context.Context, fileUrl stri
 			"url": base.Json{
 				"url": fileUrl,
 			},
-			"space": parentDir.(*Files).GetSpace(),
-		})
+		}
+
+		if files, ok := parentDir.(*Files); ok {
+			body["space"] = files.GetSpace()
+		} else {
+			// 如果不是 Files 类型，则默认使用 ThunderDriveSpace
+			body["space"] = ThunderDriveSpace
+		}
+	}
+
+	_, err := xc.Request(FILE_API_URL, http.MethodPost, func(r *resty.Request) {
+		r.SetContext(ctx)
+		r.SetQueryParam("_from", from)
+		r.SetBody(&body)
 	}, &resp)
 
 	if err != nil {
@@ -757,9 +814,7 @@ func (xc *XunLeiBrowserCommon) OfflineDownload(ctx context.Context, fileUrl stri
 	return &resp.Task, err
 }
 
-/*
-获取离线下载任务列表
-*/
+// OfflineList 获取离线下载任务列表
 func (xc *XunLeiBrowserCommon) OfflineList(ctx context.Context, nextPageToken string) ([]OfflineTask, error) {
 	res := make([]OfflineTask, 0)
 
@@ -770,6 +825,7 @@ func (xc *XunLeiBrowserCommon) OfflineList(ctx context.Context, nextPageToken st
 				"type":       "offline",
 				"limit":      "10000",
 				"page_token": nextPageToken,
+				"space":      "default/*",
 			})
 	}, &resp)
 
@@ -777,20 +833,27 @@ func (xc *XunLeiBrowserCommon) OfflineList(ctx context.Context, nextPageToken st
 		return nil, fmt.Errorf("failed to get offline list: %w", err)
 	}
 	res = append(res, resp.Tasks...)
+
 	return res, nil
 }
 
-func (xc *XunLeiBrowserCommon) DeleteOfflineTasks(ctx context.Context, taskIDs []string, deleteFiles bool) error {
+func (xc *XunLeiBrowserCommon) DeleteOfflineTasks(ctx context.Context, taskIDs []string) error {
+	queryParams := map[string]string{
+		"task_ids": strings.Join(taskIDs, ","),
+		"_t":       fmt.Sprintf("%d", time.Now().UnixMilli()),
+	}
+	if xc.UseFluentPlay {
+		queryParams["space"] = ThunderBrowserDriveFluentPlayFolderType
+	}
+
 	_, err := xc.Request(TASK_API_URL, http.MethodDelete, func(req *resty.Request) {
 		req.SetContext(ctx).
-			SetQueryParams(map[string]string{
-				"task_ids":     strings.Join(taskIDs, ","),
-				"delete_files": strconv.FormatBool(deleteFiles),
-			})
+			SetQueryParams(queryParams)
 	}, nil)
 	if err != nil {
 		return fmt.Errorf("failed to delete tasks %v: %w", taskIDs, err)
 	}
+
 	return nil
 }
 

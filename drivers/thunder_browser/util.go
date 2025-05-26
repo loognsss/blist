@@ -63,12 +63,13 @@ const (
 )
 
 const (
-	ThunderDriveSpace                 = ""
-	ThunderDriveSafeSpace             = "SPACE_SAFE"
-	ThunderBrowserDriveSpace          = "SPACE_BROWSER"
-	ThunderBrowserDriveSafeSpace      = "SPACE_BROWSER_SAFE"
-	ThunderDriveFolderType            = "DEFAULT_ROOT"
-	ThunderBrowserDriveSafeFolderType = "BROWSER_SAFE"
+	ThunderDriveSpace                       = ""
+	ThunderDriveSafeSpace                   = "SPACE_SAFE"
+	ThunderBrowserDriveSpace                = "SPACE_BROWSER"
+	ThunderBrowserDriveSafeSpace            = "SPACE_BROWSER_SAFE"
+	ThunderDriveFolderType                  = "DEFAULT_ROOT"
+	ThunderBrowserDriveSafeFolderType       = "BROWSER_SAFE"
+	ThunderBrowserDriveFluentPlayFolderType = "SPACE_FAVORITE" // 流畅播文件夹标识
 )
 
 const (
@@ -102,6 +103,7 @@ type Common struct {
 	UserAgent         string
 	DownloadUserAgent string
 	UseVideoUrl       bool
+	UseFluentPlay     bool
 	RemoveWay         string
 
 	// 验证码token刷新成功回调

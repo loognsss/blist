@@ -48,6 +48,8 @@ type ExpertAddition struct {
 
 	// 优先使用视频链接代替下载链接
 	UseVideoUrl bool `json:"use_video_url"`
+	// 离线下载是否使用 流畅播(Fluent Play)接口
+	UseFluentPlay bool `json:"use_fluent_play" default:"false" help:"use fluent play for offline download,only magnet links supported"`
 	// 移除方式
 	RemoveWay string `json:"remove_way" required:"true" type:"select" options:"trash,delete"`
 }
@@ -84,7 +86,9 @@ type Addition struct {
 	CreditKey    string `json:"credit_key" help:"credit key,used for login"` // 信任密钥
 	DeviceID     string `json:"device_id" default:""`                        // 登录设备ID
 	UseVideoUrl  bool   `json:"use_video_url" default:"false"`
-	RemoveWay    string `json:"remove_way" required:"true" type:"select" options:"trash,delete"`
+	// 离线下载是否使用 流畅播(Fluent Play)接口
+	UseFluentPlay bool   `json:"use_fluent_play" default:"false" help:"use fluent play for offline download,only magnet links supported"`
+	RemoveWay     string `json:"remove_way" required:"true" type:"select" options:"trash,delete"`
 }
 
 // GetIdentity 登录特征,用于判断是否重新登录

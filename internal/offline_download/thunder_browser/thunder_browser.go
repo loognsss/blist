@@ -104,9 +104,9 @@ func (t *ThunderBrowser) Remove(task *tool.DownloadTask) error {
 
 	switch v := storage.(type) {
 	case *thunder_browser.ThunderBrowser:
-		err = v.DeleteOfflineTasks(ctx, []string{task.GID}, false)
+		err = v.DeleteOfflineTasks(ctx, []string{task.GID})
 	case *thunder_browser.ThunderBrowserExpert:
-		err = v.DeleteOfflineTasks(ctx, []string{task.GID}, false)
+		err = v.DeleteOfflineTasks(ctx, []string{task.GID})
 	default:
 		return fmt.Errorf("unsupported storage driver for offline download, only ThunderBrowser is supported")
 	}
