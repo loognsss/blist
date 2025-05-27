@@ -24,8 +24,8 @@ jobs:
           - windows-arm64
           - android-arm64
     name: Build
-    # runs-on: ${{ matrix.platform }}
-    runs-on: self-hosted
+    runs-on: ${{ matrix.platform }}
+#    runs-on: self-hosted
     steps:
 
       - name: Checkout
