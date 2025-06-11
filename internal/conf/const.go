@@ -72,6 +72,9 @@ const (
 	// thunder_browser
 	ThunderBrowserTempDir = "thunder_browser_temp_dir"
 
+	// thunderx
+	ThunderXTempDir = "thunderx_temp_dir"
+
 	// single
 	Token         = "token"
 	IndexProgress = "index_progress"
