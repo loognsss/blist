@@ -28,11 +28,11 @@ ldflags="\
 "
 
 FetchWebDev() {
-  curl -L https://codeload.github.com/loognsss/blist-web/tar.gz/refs/heads/dev -o web-dist-dev.tar.gz
-  tar -zxvf web-dist-dev.tar.gz
+  curl -L https://codeload.github.com/loognsss/blist-web-dist/tar.gz/refs/heads/dev -o blist-web-dist-dev.tar.gz
+  tar -zxvf blist-web-dist-dev.tar.gz
   rm -rf public/dist
-  mv -f web-dist-dev/dist public
-  rm -rf web-dist-dev web-dist-dev.tar.gz
+  mv -f blist-web-dist-dev/dist public
+  rm -rf blist-web-dist-dev blist-web-dist-dev.tar.gz
 }
 
 FetchWebRelease() {
